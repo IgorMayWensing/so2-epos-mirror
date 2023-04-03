@@ -3,27 +3,33 @@
 
 using namespace EPOS;
 
-SPI spi(125000, 1, 0, 0); //mudar os args para ficar de acordo
+SPI spi(125000, 2, 1, 8); //mudar os args para ficar de acordo
 //    SPI(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int data_bits) {
 OStream cout;
 int main()
 {
-    cout << "Inicio do teste" << endl;
-    const char *data;
-    char read[7];
-    unsigned int size;
 
-    data = "Nelson";
+cout<<"START" <<endl;
 
-    size = 7; // Length of "Nelson" (6) + 1 for the null terminator
+   int ie = spi.get_ie();
+     int ip = spi.get_ip();
+
+
+     cout << "ie pre-writing: " << ie << endl;
+     cout << "ip pre-writing: " << ip << endl;
+
+     const char *data;
+     unsigned int size;
+     data = "a";
+     size = 2; // Length of "a" (1) + 1 for the null terminator
+     spi.write(data, size);
     
-    cout << "Antes do write" << endl;
-    spi.write(data, size);
+    //spi.put('a');
 
-    cout << "Entre as funcs" << endl;
+      ie = spi.get_ie();
+      ip = spi.get_ip();
 
-    spi.read(read, size);
-    cout << "Depois do read" << endl;
-    cout << "Read: " <<read << endl;
+     cout << "ie post-writing: " << ie << endl;
+     cout << "ip post-writing: " << ip << endl;
     return 0;
 }

@@ -95,6 +95,13 @@ public:
         reg(FCTRL) |= 0x1;  // Enable the controller
 
     }
+    int get_ie() {
+        return reg(IE);
+    }
+
+    int get_ip() {
+        return reg(IP);
+    }
 
     int apply_frame_size(char data) {
         unsigned int all_ones = ~0;
@@ -103,13 +110,13 @@ public:
         return data & frame_size_mask;
     }
 
-    // Gets a byte from a UART device. The method will wait until the data is ready. (https://epos.lisha.ufsc.br/EPOS+2+User+Guide#UART)
+   
     int get(){
         while(!ready_to_get());
         return reg(RXDATA) & 0xf;
     }
 
-    // Sends a byte (c) to a UART device. The method will wait until the data is transferred. (https://epos.lisha.ufsc.br/EPOS+2+User+Guide#UART)
+
     void put(int data){
         while(!ready_to_put()); // Wait until the FIFO has room
         reg(TXDATA) = apply_frame_size(data);
