@@ -38,6 +38,7 @@ public:
         OTP_BASE        = emulated ? NOT_USED : 0x10070000,   // SiFive-U OTP
         ETH_BASE        = emulated ? NOT_USED : 0x10090000,   // SiFive-U Ethernet
         FLASH_BASE      = 0x20000000,   // Virt / SiFive-U Flash
+        SPI0_BASE 		= 0x10040000,
 
         // Physical Memory at Boot
         BOOT            = Traits<Machine>::BOOT,
