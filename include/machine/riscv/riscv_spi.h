@@ -1,4 +1,4 @@
-// EPOS RISC-V SPI Mediator Declarations
+// EPOS SiFive-U (RISC-V) QSPI Hardware Mediator
 
 #ifndef __riscv_spi_h
 #define __riscv_spi_h
@@ -9,110 +9,165 @@
 
 __BEGIN_SYS
 
-class SPI
+class SiFive_SPI: public SPI_Common
 {
-private:
+    // This is a hardware object.
+    // Use with something like "new (Memory_Map::SPIx_BASE) SiFive_SPI".
 
+private:
     typedef CPU::Reg8 Reg8;
     typedef CPU::Reg32 Reg32;
 
+public:
     // SPI registers offsets from SPI_BASE
     enum {
-        // Define the register offsets for the SPI control registers
-        SCKDIV   = 0x00, //Serial clock divisor
-        SCKMODE  = 0x04, //Serial clock mode
-        CSID     = 0x10, //Chip select ID
-        CSDEF    = 0x14, //Chip select default
-        CSMODE   = 0x18, //Chip select mode
-        DELAY0   = 0x28, //Delay control 0
-        DELAY1   = 0x2C, //Delay control 1
-        FMT      = 0x40, //Frame format
-        TXDATA   = 0x48, //Tx FIFO Data
-        RXDATA   = 0x4C, //Rx FIFO data
-        TXMARK   = 0x50, //Tx FIFO watermark
-        RXMARK   = 0x54, //Rx FIFO watermark
-        FCTRL    = 0x60, //SPI flash interface control*
-        FFMT     = 0x64, //SPI flash instruction format*
-        IE       = 0x70, //SPI interrupt enable
-        IP       = 0x74, //SPI interrupt pending   
+        SCKDIV  = 0x00, // SCK divider
+        SCKMODE = 0x04, // SCK mode
+        CSID    = 0x10, // Chip select ID
+        CSDEF   = 0x14, // Chip select default
+        CSMODE  = 0x18, // Chip select mode
+        DELAY0  = 0x28, // Delay control 0
+        DELAY1  = 0x2c, // Delay control 1
+        FMT     = 0x40, // Frame format
+        TXDATA  = 0x48, // TX data
+        RXDATA  = 0x4c, // RX data
+        TXMARK  = 0x50, // TX watermark
+        RXMARK  = 0x54, // RX watermark
+        FCTRL   = 0x60, // Flash interface control
+        FFMT    = 0x64, // Flash instruction format
+        IE      = 0x70, // Interrupt enable
+        IP      = 0x74, // Interrupt pending
     };
 
     // Useful bits from multiple registers
     enum {
-        TXDATA_FULL=    1 << 31,   // TXDATA, TX FIFO full
-        FMT_LEN    =   15 << 16,
+        PROTO   =    2 << 0,
+        MSB     =    0 << 2,
+        LSB     =    1 << 2,
+        DIR_RX  =    0 << 3,
+        DIR_TX  =    1 << 3,
+        LEN     = 0x0f << 16,
+        FULL    =    1 << 31,   // TXDATA, TX FIFO full
         EMPTY   =    1 << 31,   // RXDATA, RX FIFO empty
-        // DATA    = 0xff << 0,
-        // TXEN    =    1 <<  0,   // TXCTRL, TX enable
-        // NSTOP   =    1 <<  1,   // TXCTRL, stop bits (0 -> 1 or 1 -> 2)
-        // TXCNT   =    7 << 16,   // TXCTRL, TX interrupt threshold (RXWM = (len(FIFO) < TXCNT))
-        // RXEN    =    1 <<  0,   // RXCTRL, RX enable
-        // RXCNT   =    7 << 16,   // RXCTRL, TXinterrupt threshold (TXWM = (len(FIFO) > RXCNT))
-        TXWM       =    1 <<  0,   // IE/IP, TX water mark
-        // RXWM    =    1 <<  1    // IE/IP, RX water mark
+        DATA    = 0xff << 0,
+        TXWM    =    1 <<  0,   // IE/IP, TX water mark
+        RXWM    =    1 <<  1    // IE/IP, RX water mark
     };
 
-    static constexpr unsigned int RECEIVE_IP_BIT = 4;
-    static constexpr unsigned int TRANSMIT_IP_BIT = 0;
+public:
+    void config(Hertz clock, Protocol protocol, Mode mode, unsigned int bit_rate, unsigned int data_bits) {
+        reg(SCKDIV) = ((clock / (2 * bit_rate)) - 1) & 0xfff;
+        reg(FMT) = (data_bits << 16) | DIR_RX | MSB | protocol;
+    }
+    void config(Protocol * protocol, Mode * mode, unsigned int * bit_rate, unsigned int * data_bits) {
+        *protocol = static_cast<Protocol>(reg(FMT) & PROTO);
+        *mode = MASTER;
+        *bit_rate = Traits<SPI>::CLOCK / (2 * (reg(SCKDIV) + 1));
+        *data_bits = (reg(FMT) & LEN) >> 16;
+    }
+
+    Reg32 rxdata() { return reg(RXDATA); } // RXDATA consumes the data, so the ok() logic can't be implemented here
+    Reg32 txdata() { return reg(TXDATA); }
+    void txdata(Reg32 c) { reg(TXDATA) = c; }
+
+    void int_enable(bool receive = true, bool transmit = true, bool time_out = true, bool overrun = true) {
+        reg(IE) = (receive << 1) | transmit;
+    }
+    void int_disable(bool receive = true, bool transmit = true, bool time_out = true, bool overrun = true) {
+        reg(IE) = reg(IE) & ~((receive << 1) | transmit);
+    }
+
+private:
+    volatile Reg32 & reg(unsigned int o) { return reinterpret_cast<volatile Reg32 *>(this)[o / sizeof(Reg32)]; }
+};
+
+
+class SiFive_SPI_Engine: public SPI_Common
+{
+private:
+    typedef CPU::Reg8 Reg8;
+    typedef CPU::Reg32 Reg32;
 
 public:
+    SiFive_SPI_Engine(SiFive_SPI * spi): _spi(spi), _rxd_pending(false), _rxd(0) {}
 
-    SPI(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int data_bits) {
-        config(clock, protocol, mode, data_bits);
+    void config(unsigned int clock, Protocol protocol, Mode mode, unsigned int bit_rate, unsigned int data_bits) {
+        _spi->config(clock, protocol, mode, bit_rate, data_bits);
     }
 
-    public:
-    void config(unsigned int clock, unsigned int protocol, unsigned int mode, unsigned int data_bits){
-
-        // Set the SPI registers
-        // Configure the SPI controller registers
-        reg(SCKDIV) = ((Traits<SPI>::CLOCK / (2 * clock)) - 1) & 0xFFF; //CLOCK EH O DA MAQUINA E O clock EH O SCLOCK
-        reg(SCKMODE) &= ~0x3;                                           // Clear only the first 2 bits (0x3 = 0b11) //set phase and polarity to 0, their default value
-
-        // Clear the FIFOs and enable the controller
-        reg(CSID) = 0x0; // Set the chip select ID
-        reg(CSDEF) = 0x0; // Set the chip select default
-        reg(CSMODE) = mode << 0; // Set the chip select mode
-
-        reg(DELAY0) = (reg(DELAY0) & ~(0xFF | (0xFF << 16))) | (0x1 | (0x1 << 16));
-        // Clear bits 0 to 7 and bits 16 to 23
-        reg(DELAY1) &= ~(0xFF | (0xFF << 16));
-
-        // Set bits 0 to 7 to 0x1 and keep bits 16 to 23 as 0x0
-        reg(DELAY1) |= 0x1;
-        
-
-        // Clear bits 0 to 2 and bits 16 to 19
-        
-        reg(FMT) = (protocol << 0) | (0 << 2) | (1 << 3) | (data_bits << 16); 
-        
-        // Clear bits 0 to 7
-        reg(TXDATA) &= ~0xFF;
-        // Clear bits 0 to 2
-        reg(TXMARK) = 1 << 0;
-        reg(RXMARK) &= ~(0x7);
-        
-        reg(FCTRL) |= 0x1;  // Enable the controller
-
+    void config(Protocol * protocol, Mode * mode, unsigned int * bit_rate, unsigned int * data_bits) {
+        _spi->config(protocol, mode, bit_rate, data_bits);
     }
 
-    int apply_frame_size(char data) {
-        unsigned int all_ones = ~0;
-        unsigned int frame_size = reg(FMT) & FMT_LEN >> 16;
-        unsigned int frame_size_mask = ~(all_ones << frame_size);
-        return data & frame_size_mask;
+    Reg8 rxd() { return (_rxd_pending ? _rxd : _spi->rxdata()) & SiFive_SPI::DATA; }
+    bool rxd_ok() {
+        _rxd = _spi->rxdata();
+        _rxd_pending = !(_rxd & SiFive_SPI::EMPTY);
+        return _rxd_pending;
     }
 
-    // Gets a byte from a UART device. The method will wait until the data is ready. (https://epos.lisha.ufsc.br/EPOS+2+User+Guide#UART)
-    int get(){
-        while(!ready_to_get());
-        return reg(RXDATA) & 0xf;
+    void txd(Reg8 c) { _spi->txdata(c); }
+    bool txd_ok() { return !(_spi->txdata() & SiFive_SPI::FULL); }
+
+private:
+    SiFive_SPI * _spi;
+    bool _rxd_pending;
+    Reg32 _rxd;
+};
+
+
+class SPI: private SiFive_SPI_Engine
+{
+private:
+    static const unsigned int UNITS = Traits<SPI>::UNITS;
+
+    static const unsigned int CLOCK = Traits<SPI>::CLOCK;
+
+    static const unsigned int UNIT = Traits<SPI>::DEF_UNIT;
+    static const Protocol PROTOCOL = static_cast<Protocol>(Traits<SPI>::DEF_PROTOCOL);
+    static const Mode MODE = static_cast<Mode>(Traits<SPI>::DEF_MODE);
+    static const unsigned int BIT_RATE = Traits<SPI>::DEF_BIT_RATE;
+    static const unsigned int DATA_BITS = Traits<SPI>::DEF_DATA_BITS;
+
+public:
+    using SPI_Common::Protocol;
+    using SPI_Common::Mode;
+
+    using SPI_Common::MASTER;
+    using SPI_Common::SLAVE;
+    using SPI_Common::Si5_SINGLE;
+    using SPI_Common::Si5_DUAL;
+    using SPI_Common::Si5_QUAD;
+
+public:
+    SPI(unsigned int unit = UNIT, Protocol protocol = PROTOCOL, Mode mode = MODE, unsigned int bit_rate = BIT_RATE, unsigned int data_bits = DATA_BITS):
+        SiFive_SPI_Engine(reinterpret_cast<SiFive_SPI *>((unit == 0) ? Memory_Map::SPI0_BASE : (unit == 1) ? Memory_Map::SPI1_BASE : Memory_Map::SPI2_BASE)), _unit(unit) {
+        assert(unit < UNITS);
+        config(CLOCK, protocol, mode, bit_rate, data_bits);
     }
 
-    // Sends a byte (c) to a UART device. The method will wait until the data is transferred. (https://epos.lisha.ufsc.br/EPOS+2+User+Guide#UART)
-    void put(int data){
-        while(!ready_to_put()); // Wait until the FIFO has room
-        reg(TXDATA) = apply_frame_size(data);
+    using SiFive_SPI_Engine::config;
+
+    int get() { 
+        while(!rxd_ok());
+        return rxd();
+    }
+    bool try_get(int * data) {
+        if(!rxd_ok())
+            return false;
+        *data = rxd();
+        return true;
+    }
+
+    void put(int data) {
+        while(!txd_ok());
+        txd(data);
+    }
+    bool try_put(int data) {
+        if(txd_ok())
+            return false;
+        txd(data);
+        return true;
     }
 
     int read(char * data, unsigned int max_size) {
@@ -120,35 +175,19 @@ public:
             data[i] = get();
         return 0;
     }
-
-    // Sends an array of characters, using put
     int write(const char * data, unsigned int size) {
         for(unsigned int i = 0; i < size; i++)
             put(data[i]);
         return 0;
     }
 
-    void flush() { while(!(reg(IP) & TXWM)); }
-
     bool ready_to_get() { return rxd_ok(); }
     bool ready_to_put() { return txd_ok(); }
-    bool rxd_ok() { return !(reg(RXDATA) & EMPTY); }
-    bool txd_ok() { return !(reg(TXDATA) & TXDATA_FULL); }
 
-    void int_enable(bool receive = true, bool transmit = true, bool time_out = true, bool overrun = true) {
-         reg(IE) = (receive << 1) | transmit;
-    }
-    void int_disable(bool receive = true, bool transmit = true, bool time_out = true, bool overrun = true) {
-         reg(IE) = reg(IE) & ~((receive << 1) | transmit);
-    }
-
-    private:
-    static volatile Reg32& reg(unsigned int offset) {
-        return *reinterpret_cast<volatile Reg32*>(Memory_Map::SPI0_BASE + offset);
-    }
+private:
+    unsigned int _unit;
 };
 
 __END_SYS
 
 #endif
-
