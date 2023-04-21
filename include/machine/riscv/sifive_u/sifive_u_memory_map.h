@@ -23,9 +23,12 @@ public:
         MIO_BASE        = Traits<Machine>::MIO_BASE,
         MIO_TOP         = Traits<Machine>::MIO_TOP,
         INT_M2S         = RAM_TOP + 1 - 4096,   // the last page is used by the _int_m2s() interrupt forwarder installed by SETUP; code and stack share the same page, with code at the bottom and the stack at the top
-        BOOT_STACK      = (multitask ? INT_M2S : RAM_TOP + 1) - Traits<Machine>::STACK_SIZE, // will be used as the stack's base, not the stack pointer
-        FREE_BASE       = RAM_BASE,
-        FREE_TOP        = BOOT_STACK,
+        //BOOT_STACK      = (multitask ? INT_M2S : RAM_TOP + 1) - Traits<Machine>::STACK_SIZE, // will be used as the stack's base, not the stack pointer
+        //FREE_BASE       = RAM_BASE,
+        //FREE_TOP        = BOOT_STACK,
+        BOOT_STACK      = Traits<Machine>::BOOT_STACK, // will be used as the stack's base, not the stack pointer
+        FREE_BASE       = Traits<Machine>::FREE_BASE,
+        FREE_TOP        = Traits<Machine>::FREE_TOP,
 
         // Memory-mapped devices
         BIOS_BASE       = 0x00001000,   // BIOS ROM
@@ -56,20 +59,26 @@ public:
         APP_DATA        = Traits<Machine>::APP_DATA,
 
         INIT            = Traits<Machine>::INIT,
-
         PHY_MEM         = Traits<Machine>::PHY_MEM,
-
         IO              = Traits<Machine>::IO,
 
         SYS             = Traits<Machine>::SYS,
-        SYS_CODE        = multitask ? SYS + 0x00000000 : NOT_USED,
-        SYS_INFO        = multitask ? SYS + 0x00100000 : NOT_USED,
-        SYS_PT          = multitask ? SYS + 0x00101000 : NOT_USED,
-        SYS_PD          = multitask ? SYS + 0x00102000 : NOT_USED,
-        SYS_DATA        = multitask ? SYS + 0x00103000 : NOT_USED,
-        SYS_STACK       = multitask ? SYS + 0x00200000 : NOT_USED,
-        SYS_HEAP        = multitask ? SYS + 0x00400000 : NOT_USED,
-        SYS_HIGH        = multitask ? SYS + 0x007fffff : NOT_USED
+        // SYS_CODE        = multitask ? SYS + 0x00000000 : NOT_USED,
+        // SYS_INFO        = multitask ? SYS + 0x00100000 : NOT_USED,
+        // SYS_PT          = multitask ? SYS + 0x00101000 : NOT_USED,
+        // SYS_PD          = multitask ? SYS + 0x00102000 : NOT_USED,
+        // SYS_DATA        = multitask ? SYS + 0x00103000 : NOT_USED,
+        // SYS_STACK       = multitask ? SYS + 0x00200000 : NOT_USED,
+        // SYS_HEAP        = multitask ? SYS + 0x00400000 : NOT_USED,
+        // SYS_HIGH        = multitask ? SYS + 0x007fffff : NOT_USED
+        SYS_CODE        = Traits<Machine>::SYS_CODE,
+        SYS_INFO        = Traits<Machine>::SYS_INFO,
+        SYS_PT          = Traits<Machine>::SYS_PT,
+        SYS_PD          = Traits<Machine>::SYS_PD,
+        SYS_DATA        = Traits<Machine>::SYS_DATA,
+        SYS_STACK       = Traits<Machine>::SYS_STACK,
+        SYS_HEAP        = Traits<Machine>::SYS_HEAP,
+        SYS_HIGH        = Traits<Machine>::SYS_HIGH
     };
 };
 

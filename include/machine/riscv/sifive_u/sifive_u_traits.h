@@ -17,42 +17,52 @@ protected:
 template<> struct Traits<Machine>: public Traits<Machine_Common>
 {
 public:
-    // Value to be used for undefined addresses
-    static const unsigned int NOT_USED          = 0xffffffff;
-
-    // Clocks
-    static const unsigned int CLOCK             = 1000000000;                            // CORECLK
-    static const unsigned int HFCLK             =   33330000;                            // FU540-C000 generates all internal clocks from 33.33 MHz hfclk driven from an external oscillator (HFCLKIN) or crystal (HFOSCIN) input, selected by input HFXSEL.
-    static const unsigned int RTCCLK            =    1000000;                            // The CPU real time clock (rtcclk) runs at 1 MHz and is driven from input pin RTCCLKIN. This should be connected to an external oscillator.
-    static const unsigned int TLCLK             = CLOCK / 2;                            // L2 cache and peripherals such as UART, SPI, I2C, and PWM operate in a single clock domain (tlclk) running at coreclk/2 rate. There is a low-latency 2:1 crossing between coreclk and tlclk domains.
+    static const unsigned long NOT_USED          = 0xffffffffffffffff;  // Change to 64bits
+    // Default Sizes and Quantities
+    static const unsigned long MAX_THREADS       = 16;
+    static const unsigned long STACK_SIZE        = 0x10000;     // 64 kB (64 * 1024)
+    static const unsigned long HEAP_SIZE         = 0x100000;    // 1 MB
+    static const unsigned long PAGE_SIZE         = 0x200000;    // 2^21 2 MB
+    // static const unsigned long PAGE_SIZE         = 0x1000;      // 2^12 4 kB
+    static const unsigned long PAGE_ENTRIES      = 512;         // 2^9 VPN[2]
 
     // Physical Memory
-    static const unsigned int RAM_BASE          = 0x80000000;                           // 2 GB
-    static const unsigned int RAM_TOP           = 0x87ffffff;                           // 2 GB + 128 MB (max 1536 MB of RAM => RAM + MIO < 2 G)
-    static const unsigned int MIO_BASE          = 0x00000000;
-    static const unsigned int MIO_TOP           = 0x1fffffff;                           // 512 MB (max 512 MB of MIO => RAM + MIO < 2 G)
+    static const unsigned long RAM_BASE          = 0x80000000;                           // 2 GB
+    static const unsigned long RAM_TOP           = 0xffffffff;                           // 2 GB (0xFFFFFFFF - 0x80000000)
+    static const unsigned long MIO_BASE          = 0x00000000;
+    static const unsigned long MIO_TOP           = 0x1fffffff;                            // 512 MB (max 512 MB of MIO => RAM + MIO < 2 GB)
+    static const unsigned long PAGE_TABLE        = RAM_BASE;                              // reserve PAGE_TABLES on the begining of the ram
+    static const unsigned long BOOT_STACK        = RAM_TOP + 1 - STACK_SIZE;              // 64kB will be used as the stack's base, not the stack pointer
+    static const unsigned long FREE_BASE         = RAM_BASE + (PAGE_ENTRIES * PAGE_SIZE); // Free memory from RAM_BASE + PAGE_TABLE
+    static const unsigned long FREE_TOP          = BOOT_STACK;
 
     // Physical Memory at Boot
-    static const unsigned int BOOT              = NOT_USED;
-    static const unsigned int SETUP             = library ? NOT_USED : RAM_BASE;        // RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
-    static const unsigned int IMAGE             = 0x80100000;                           // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
+    static const unsigned long BOOT              = NOT_USED;
+    static const unsigned long SETUP             = NOT_USED;            // RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
+    static const unsigned long IMAGE             = RAM_BASE + 0x100000; // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
 
     // Logical Memory
-    static const unsigned int APP_LOW           = library ? RAM_BASE : 0x80400000;      // 2 GB + 4 MB
-    static const unsigned int APP_HIGH          = 0xff7fffff;                           // SYS - 1
+    // Sv39, all bits from 63-39 must be equal to the bit 38
+    static const unsigned long APP_LOW           = 0x0000000080000000;      // 2 GB
+    static const unsigned long APP_HIGH          = 0x0000003fffffffff;      // 256 GB
+    static const unsigned long APP_CODE          = APP_LOW;                 // 2 GB
+    static const unsigned long APP_DATA          = APP_CODE + 0x400000;     // 4 MB
 
-    static const unsigned int APP_CODE          = APP_LOW;
-    static const unsigned int APP_DATA          = APP_CODE + 4 * 1024 * 1024;
+    static const unsigned long INIT              = NOT_USED;      // previous= RAM_BASE + 512 KB (will be part of the free memory at INIT)
+    static const unsigned long PHY_MEM           = NOT_USED;      // disable phy_mem
+    static const unsigned long IO                = NOT_USED;      // IO not being used
 
-    static const unsigned int INIT              = library ? NOT_USED :0x80080000;       // RAM_BASE + 512 KB (will be part of the free memory at INIT)
-    static const unsigned int PHY_MEM           = 0x20000000;                           // 512 MB (max 1536 MB of RAM)
-    static const unsigned int IO                = 0x00000000;                           // 0 (max 512 MB of IO = MIO_TOP - MIO_BASE)
-    static const unsigned int SYS               = 0xff800000;                           // 4 GB - 8 MB
-
-    // Default Sizes and Quantities
-    static const unsigned int MAX_THREADS       = 16;
-    static const unsigned int STACK_SIZE        = 64 * 1024;
-    static const unsigned int HEAP_SIZE         = 1 * 1024 * 1024;
+    // Logical System Memory
+    // Sv39, all bits from 63-39 must be equal to the bit 38
+    static const unsigned long SYS               = 0xffffffc000000000;      // 256 GB
+    static const unsigned long SYS_CODE          = NOT_USED;
+    static const unsigned long SYS_INFO          = NOT_USED;
+    static const unsigned long SYS_PT            = NOT_USED;
+    static const unsigned long SYS_PD            = NOT_USED;
+    static const unsigned long SYS_DATA          = NOT_USED;
+    static const unsigned long SYS_STACK         = NOT_USED;
+    static const unsigned long SYS_HEAP          = NOT_USED;
+    static const unsigned long SYS_HIGH          = NOT_USED;
 };
 
 template <> struct Traits<IC>: public Traits<Machine_Common>
@@ -65,7 +75,7 @@ template <> struct Traits<Timer>: public Traits<Machine_Common>
     static const bool debugged = hysterically_debugged;
 
     static const unsigned int UNITS = 1;
-    static const unsigned int CLOCK = Traits<Machine>::RTCCLK;
+    static const unsigned int CLOCK = 10000000;
 
     // Meaningful values for the timer frequency range from 100 to 10000 Hz. The
     // choice must respect the scheduler time-slice, i. e., it must be higher
@@ -77,7 +87,7 @@ template <> struct Traits<UART>: public Traits<Machine_Common>
 {
     static const unsigned int UNITS = 2;
 
-    static const unsigned int CLOCK = Traits<Machine>::TLCLK;
+    static const unsigned int CLOCK = 22729000;
 
     static const unsigned int DEF_UNIT = 1;
     static const unsigned int DEF_BAUD_RATE = 115200;
@@ -90,7 +100,7 @@ template <> struct Traits<SPI>: public Traits<Machine_Common>
 {
     static const unsigned int UNITS = 3;
 
-    static const unsigned int CLOCK = Traits<Machine>::TLCLK;
+    static const unsigned int CLOCK = 22729000;
 
     static const unsigned int DEF_UNIT = 0;
     static const unsigned int DEF_PROTOCOL = 0;
