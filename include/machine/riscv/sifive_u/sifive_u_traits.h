@@ -17,6 +17,9 @@ protected:
 template<> struct Traits<Machine>: public Traits<Machine_Common>
 {
 public:
+    static const unsigned int CLOCK             = 1000000000;                            // CORECLK
+    static const unsigned int HFCLK             =   33330000;                            // FU540-C000 generates all internal clocks from 33.33 MHz hfclk driven from an external oscillator (HFCLKIN) or crystal (HFOSCIN) input, selected by input HFXSEL.
+
     static const unsigned long NOT_USED          = 0xffffffffffffffff;  // Change to 64bits
     // Default Sizes and Quantities
     static const unsigned long MAX_THREADS       = 16;
