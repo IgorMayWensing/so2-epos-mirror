@@ -43,17 +43,19 @@ public:
         // Page tables
         PAddr sys_pd;           // System Page Directory
         PAddr sys_pt;           // System Page Table
-        PAddr phy_mem_pt;       // Contiguous set of Page tables to map the whole physical memory (pointer to the first)
+        PAddr phy_mem_pts;      // Page tables to map the whole physical memory
         PAddr io_pts;           // Page tables to map the I/O address space
-        PAddr app_code_pt;      // First Application code segment's contiguous set of Page Table (pointer to the first)
-        PAddr app_data_pt;      // First Application data segment's contiguous set of Page Table (pointer to the first)
-        PAddr app_extra_pt;     // First Application data segment's contiguous set of Page Table (pointer to the first)
+        PAddr app_code_pts;     // First Application code segment's Page Table
+        PAddr app_data_pts;     // First Application data segment's Page Table
+        PAddr app_extra_pts;    // First Application data segment's Page Table
 
         // Pointers and data structures
         PAddr sys_info;         // System Info
         PAddr sys_code;         // OS Code segment
         PAddr sys_data;         // OS Data segment
         PAddr sys_stack;        // OS Stack segment  (used only during init and for ukernels, with one stack per core)
+        PAddr ini_code;         // Init Code segment
+        PAddr ini_data;         // Init Data segment
         PAddr app_code;         // First Application code segment
         PAddr app_data;         // First Application data segment (including heap, stack, and extra)
         PAddr app_extra;        // APP EXTRA segment (copied from the boot image)

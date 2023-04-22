@@ -34,7 +34,7 @@ OStream & operator<<(OStream & os, const System_Info & si)
 #endif
        << ",sys_pt="       << reinterpret_cast<void *>(si.pmm.sys_pt)
        << ",sys_pd="       << reinterpret_cast<void *>(si.pmm.sys_pd)
-       << ",phy_mem_pt="   << reinterpret_cast<void *>(si.pmm.phy_mem_pt)
+       << ",phy_mem_pt="   << reinterpret_cast<void *>(si.pmm.phy_mem_pts)
        << ",io_pts="       << reinterpret_cast<void *>(si.pmm.io_pts)
        << ",usr_mem_base=" << reinterpret_cast<void *>(si.pmm.usr_mem_base)
        << ",usr_mem_top="  << reinterpret_cast<void *>(si.pmm.usr_mem_top)

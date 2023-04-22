@@ -7,8 +7,9 @@
 
 __BEGIN_SYS
 
-class Address_Space: private MMU::Directory
+class Address_Space: public MMU::Directory
 {
+
 public:
     typedef CPU::Phy_Addr Phy_Addr;
     typedef CPU::Log_Addr Log_Addr;
@@ -39,6 +40,7 @@ public:
     typedef MMU::Flags Flags;
 
 public:
+    // Segment(unsigned int bytes, const Flags & flags);
     Segment(unsigned int bytes, Flags flags = Flags::APP);
     Segment(Phy_Addr phy_addr, unsigned int bytes, Flags flags);
     ~Segment();
