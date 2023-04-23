@@ -5,10 +5,10 @@ include ../../makedefs
 all: install
 
 $(APPLICATION):	$(APPLICATION).o $(LIB)/*
-		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
+		$(ALD) $(ALDFLAGS) -g -o $@ $(APPLICATION).o
 
 $(APPLICATION).o: $(APPLICATION).cc $(SRC)
-		$(ACC) $(ACCFLAGS) -o $@ $<
+		$(ACC) $(ACCFLAGS) -g -o $@ $<
 
 install: $(APPLICATION)
 		$(INSTALL) $(APPLICATION) $(IMG)

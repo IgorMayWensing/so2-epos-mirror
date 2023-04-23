@@ -31,13 +31,15 @@ img/$(APPLICATION)$(MACH_IMGSUFF):
 		
 debug: FORCE
 ifndef APPLICATION
-		$(foreach app,$(APPLICATIONS),$(MAKE) DEBUG=1 APPLICATION=$(app) debug1;)
+		$(foreach app,$(APPLICATIONS),$(MAKE) DEBUG=1 APPLICATION=$(app) debug1;);
+		lsof -t -i :1235 | xargs kill -9
 else
 		$(MAKE) DEBUG=1 all1 debug1
 endif
 
 debug1: etc img/$(APPLICATION)$(MACH_IMGSUFF)
 		(cd img && $(MAKE) DEBUG=1 debug)
+		lsof -t -i :1235 | xargs kill -9
 
 flash: FORCE
 ifndef APPLICATION
