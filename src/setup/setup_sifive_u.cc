@@ -428,57 +428,64 @@ void Setup::build_lm()
 
 void Setup::init_mmu()
 {
+    // Define the number of entries in a page table
     unsigned int PT_ENTRIES = MMU::PT_ENTRIES;
+    // Calculate the number of pages needed to cover the RAM
     unsigned long pages = MMU::pages(RAM_TOP + 1);
-
-
+    // Display the total number of pages
     kout << "pages = " << pages << endl;
 
+    // Calculate the number of page tables needed to cover the pages
     unsigned total_pts = MMU::page_tables(pages);
     kout << "pts = " << total_pts << endl;
 
+    // Define the number of entries for each level of page directories and tables
     unsigned int PD_ENTRIES_LVL_2 = total_pts / PT_ENTRIES;
-    unsigned int PD_ENTRIES_LVL_1 = PT_ENTRIES;
+    unsigned int PT_ENTRIES_LVL_1 = PT_ENTRIES;
     unsigned int PT_ENTRIES_LVL_0 = PT_ENTRIES;
 
-    // kout << "LVL 2: " << PD_ENTRIES_LVL_2 << endl;
-
+    // Calculate the physical address for level 2 page directory
     Phy_Addr PD2_ADDR = PAGE_TABLES;
     Phy_Addr pts = PAGE_TABLES;
     kout << "Page Tables: " << pts << endl;
+    // Create a new master page directory for level 2
     Page_Directory *master = new ((void *)PD2_ADDR) Page_Directory();
     kout << "SATP: " << PD2_ADDR << endl;
     PD2_ADDR += PAGE_SIZE;
 
+    // Remap the level 2 page directory
     master->remap(PD2_ADDR, RV64_Flags::V, 0, PD_ENTRIES_LVL_2);
 
-    Phy_Addr PD1_ADDR = PD2_ADDR + PT_ENTRIES * PAGE_SIZE;
-    Phy_Addr PT0_ADDR = PD1_ADDR;
+    // Calculate the physical addresses for level 1 and level 0 page tables
+    Phy_Addr PT1_ADDR = PD2_ADDR + PT_ENTRIES * PAGE_SIZE;
+    Phy_Addr PT0_ADDR = PT1_ADDR;
 
+    // Initialize level 1 page tables and remap them
     for (unsigned long i = 0; i < PD_ENTRIES_LVL_2; i++)
     {
-        Page_Directory *pd_lv1 = new ((void *)PD2_ADDR) Page_Directory();
+        Page_Table *pt_lv1 = new ((void *)PD2_ADDR) Page_Table();
         PD2_ADDR += PAGE_SIZE;
 
-        pd_lv1->remap(PD1_ADDR, RV64_Flags::V, 0, PD_ENTRIES_LVL_1);
-        PD1_ADDR += PD_ENTRIES_LVL_1 * PAGE_SIZE;
+        pt_lv1->remap(PT1_ADDR, RV64_Flags::V, 0, PT_ENTRIES_LVL_1);
+        PT1_ADDR += PT_ENTRIES_LVL_1 * PAGE_SIZE;
     }
 
-    PD1_ADDR = 0;
+    // Initialize level 0 page tables and remap them
+    PT1_ADDR = 0;
     for (unsigned long i = 0; i < PD_ENTRIES_LVL_2; i++)
     {
-        for (unsigned long j = 0; j < PD_ENTRIES_LVL_1; j++)
+        for (unsigned long j = 0; j < PT_ENTRIES_LVL_1; j++)
         {
             Page_Table *pt_lv0 = new ((void *)PT0_ADDR) Page_Table();
             PT0_ADDR += PAGE_SIZE;
-            pt_lv0->remap(PD1_ADDR, RV64_Flags::SYS, 0, PT_ENTRIES_LVL_0);
-            PD1_ADDR += PD_ENTRIES_LVL_1 * PAGE_SIZE;
+            pt_lv0->remap(PT1_ADDR, RV64_Flags::SYS, 0, PT_ENTRIES_LVL_0);
+            PT1_ADDR += PT_ENTRIES_LVL_1 * PAGE_SIZE;
         }
     }
     kout << "Last Directory" << PD2_ADDR << endl;
-    kout << "Last Page" << PD1_ADDR - 1 << endl;
+    kout << "Last Page" << PT1_ADDR - 1 << endl;
 
-    // SYSTEM MAPPING
+    // Set up the system mapping
     kout << "System Mapping" << endl;
 
     kout << "SIZE: " << (Phy_Addr) (SYS_HEAP - INIT) << endl;
@@ -486,41 +493,58 @@ void Setup::init_mmu()
 
     kout << "PAGE_TABLES: "  << (Phy_Addr) PAGE_TABLES << endl;
 
-
+    // Calculate the number of pages and page tables for the system mapping
     unsigned long sys_pages = MMU::pages(SYS_HEAP - INIT);
     unsigned sys_pts = MMU::page_tables(sys_pages);
     int page = MMU::directory_lvl_2(INIT);
     Phy_Addr addr = PAGE_TABLES + (1 + page) * PAGE_SIZE;
-
+    // Remap the master page directory for the system mapping
     master->remap(addr, RV64_Flags::V, page, page + 1);
-    Page_Directory * sys_pd = new ((void *)addr) Page_Directory();
-    addr = PAGE_TABLES + (1 + PD_ENTRIES + PD_ENTRIES_LVL_2 * PD_ENTRIES) * PAGE_SIZE;
-    sys_pd->remap(addr, RV64_Flags::V, 0, sys_pts);
+    // Create a new page table for the system mapping
+    Page_Table * sys_pt1 = new ((void *)addr) Page_Table();
+    addr = PAGE_TABLES + (1 + PD_ENTRIES + PD_ENTRIES_LVL_2 * PT_ENTRIES) * PAGE_SIZE;
+    sys_pt1->remap(addr, RV64_Flags::V, 0, sys_pts);
 
+    // Calculate the address for the system mapping page tables
     unsigned long sys_addr = PAGE_TABLES + (1 + PD_ENTRIES + PD_ENTRIES * PD_ENTRIES - sys_pages) * PAGE_SIZE;
+    
+    Log_Addr MAX_ADDR = 0x00000000280000000; // Adjust this value based on your desired limit
+    
+    // Initialize the system mapping page tables and remap them
     for (unsigned long i = 0; i < sys_pts; i++) {
-      Page_Table * sys_pt = new ((void *)addr) Page_Table();
-      addr += PAGE_SIZE;
-      sys_pt->remap(sys_addr, RV64_Flags::SYS);
-      sys_addr += PD_ENTRIES * PAGE_SIZE;
+
+        int banana = 1;
+        if ((addr + PAGE_SIZE) >= MAX_ADDR) {
+            kout << "Reached memory address limit at iteration: " << i << endl;
+            kout << "MAX_ADDR: " << MAX_ADDR << endl;
+            kout << "addr: " << addr << endl;
+            kout << "PAGE_SIZE: " << PAGE_SIZE << endl;
+            banana += banana;
+            break;
+        }
+        Page_Table * sys_pt0 = new ((void *)addr) Page_Table();
+        addr += PAGE_SIZE;
+        sys_pt0->remap(sys_addr, RV64_Flags::SYS);
+        sys_addr += PT_ENTRIES * PAGE_SIZE;
     }
 
+    // Display information about the memory allocation
     db<Setup>(WRN) << "addr = " << hex << addr << endl;
     db<Setup>(WRN) << "sys_addr = " << sys_addr << endl;
 
-    si->pmm.free1_base = RAM_BASE;
-    si->pmm.free1_top = addr;
+    // Update the system information with the base and top addresses of the free memory
+    // si->pmm.free1_base = RAM_BASE;
+    // si->pmm.free1_top = addr;
 
-    // Set SATP and enable paging
-    // db<Setup>(WRN) << "Set SATP" << endl;
+    // Set the SATP register and enable paging
     CPU::satp((1UL << 63) | (reinterpret_cast<unsigned long>(master) >> 12));
-    // db<Setup>(WRN) << "Flush TLB" << endl;
-    // Flush TLB to ensure we've got the right memory organization
+    // Flush the TLB to ensure the correct memory organization
     MMU::flush_tlb();
 
-    asm("setup:");
-
-};
+    int laranja = 1;
+    laranja += 1;
+    // asm("setup:");
+}
 
 void Setup::call_next()
 {
