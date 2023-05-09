@@ -34,11 +34,11 @@ public:
 
     // Physical Memory at Boot
     static const unsigned int BOOT              = NOT_USED;
-    static const unsigned int SETUP             = library ? NOT_USED : RAM_BASE;        // RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
+    static const unsigned int SETUP             = RAM_BASE;        // RAM_BASE (will be part of the free memory at INIT, using a logical address identical to physical eliminate SETUP relocation)
     static const unsigned int IMAGE             = 0x80100000;                           // RAM_BASE + 1 MB (will be part of the free memory at INIT, defines the maximum image size; if larger than 3 MB then adjust at SETUP)
 
     // Logical Memory
-    static const unsigned int APP_LOW           = library ? RAM_BASE : 0x80400000;      // 2 GB + 4 MB
+    static const unsigned int APP_LOW           = 0x88000000;
     static const unsigned int APP_HIGH          = 0xff7fffff;                           // SYS - 1
 
     static const unsigned int APP_CODE          = APP_LOW;

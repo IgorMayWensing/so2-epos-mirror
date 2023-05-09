@@ -25,6 +25,7 @@ endif
 
 run1: etc img/$(APPLICATION)$(MACH_IMGSUFF)
 		(cd img && $(MAKE) run1)
+		lsof -t -i :1235 | xargs kill -9
 		
 img/$(APPLICATION)$(MACH_IMGSUFF):
 		$(MAKE) $(PRECLEAN) all1
@@ -38,6 +39,8 @@ endif
 
 debug1: etc img/$(APPLICATION)$(MACH_IMGSUFF)
 		(cd img && $(MAKE) DEBUG=1 debug)
+		lsof -t -i :1235 | xargs kill -9
+
 
 flash: FORCE
 ifndef APPLICATION

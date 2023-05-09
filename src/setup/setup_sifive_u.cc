@@ -9,6 +9,14 @@
 #include <utility/elf.h>
 #include <utility/string.h>
 
+namespace EPOS {
+namespace S {
+
+bool has_virtual_memory = false;
+
+} // namespace S
+} // namespace EPOS
+
 extern "C" {
     void _start();
 
@@ -193,11 +201,12 @@ void Setup::build_lm()
     db<Setup>(TRC) << "Setup::build_lm()" << endl;
 
     // Get boot image structure
-    si->lm.has_stp = (si->bm.setup_offset != -1u);
-    si->lm.has_ini = (si->bm.init_offset != -1u);
-    si->lm.has_sys = (si->bm.system_offset != -1u);
-    si->lm.has_app = (si->bm.application_offset != -1u);
-    si->lm.has_ext = (si->bm.extras_offset != -1u);
+    
+    si->lm.has_stp = (si->bm.setup_offset != -1ul);
+    si->lm.has_ini = (si->bm.init_offset != -1ul);
+    si->lm.has_sys = (si->bm.system_offset != -1ul);
+    si->lm.has_app = (si->bm.application_offset != -1ul);
+    si->lm.has_ext = (si->bm.extras_offset != -1ul);
 
     // Check SETUP integrity and get the size of its segments
     if(si->lm.has_stp) {
@@ -526,12 +535,12 @@ void Setup::setup_sys_pd()
     // Attach the first APPLICATION CODE (i.e. app_code_pt)
     Chunk app_code(si->pmm.app_code_pt, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::APPC);
     if(dir.attach(app_code, si->lm.app_code) != si->lm.app_code)
-        db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach the application code at " << reinterpret_cast<void *>(si->lm.app_code) << "!" << endl;
+        db<Setup>(ERR) << "error1 Setup::setup_sys_pd: cannot attach the application code at " << reinterpret_cast<void *>(si->lm.app_code) << "!" << endl;
 
     // Attach the first APPLICATION DATA (i.e. app_data_pt, containing heap, stack and extra)
     Chunk app_data(si->pmm.app_data_pt, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::APPD);
     if(dir.attach(app_data, si->lm.app_data) != si->lm.app_data)
-        db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach the application data at " << reinterpret_cast<void *>(si->lm.app_data) << "!" << endl;
+        db<Setup>(ERR) << "error2 Setup::setup_sys_pd: cannot attach the application data at " << reinterpret_cast<void *>(si->lm.app_data) << "!" << endl;
 
     // Save free chunks to be passed to MMU::init()
     si->pmm.free1_base = si->bm.mem_base;
@@ -559,6 +568,7 @@ void Setup::enable_paging()
 
     // Set SATP and enable paging
     MMU::pd(multitask ? si->pmm.sys_pd : FLAT_MEM_MAP);
+    has_virtual_memory = true;
 
     // Flush TLB to ensure we've got the right memory organization
     MMU::flush_tlb();
@@ -765,47 +775,47 @@ void _setup() // supervisor mode
 // Therefore, an interrupt forwarder must be installed. We use RAM_TOP for this, with the code at the beginning of the last page and a stack at the end of the same page.
 void _int_m2s()
 {
-    // Save context
-    ASM("        csrw  mscratch,     sp                                 \n");
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("        la          sp,     %0                                 \n"
-        "        sw          a2,   0(sp)                                \n"
-        "        sw          a3,   4(sp)                                \n"
-        "        sw          a4,   8(sp)                                \n"
-        "        sw          a5,  12(sp)                                \n" : : "i"(Memory_Map::BOOT_STACK - 16));
-} else {
-    ASM("        lui         sp,     %0                                 \n"
-        "        addi        sp, sp, %1                                 \n"
-        "        sd          a2,   0(sp)                                \n"
-        "        sd          a3,   8(sp)                                \n"
-        "        sd          a4,  16(sp)                                \n"
-        "        sd          a5,  24(sp)                                \n" : : "i"((Memory_Map::BOOT_STACK - 32) >> 12), "i"((Memory_Map::BOOT_STACK - 32) && 0xfff));
-}
+//     // Save context
+//     ASM("        csrw  mscratch,     sp                                 \n");
+// if(Traits<CPU>::WORD_SIZE == 32) {
+//     ASM("        la          sp,     %0                                 \n"
+//         "        sw          a2,   0(sp)                                \n"
+//         "        sw          a3,   4(sp)                                \n"
+//         "        sw          a4,   8(sp)                                \n"
+//         "        sw          a5,  12(sp)                                \n" : : "i"(Memory_Map::BOOT_STACK - 16));
+// } else {
+//     ASM("        lui         sp,     %0                                 \n"
+//         "        addi        sp, sp, %1                                 \n"
+//         "        sd          a2,   0(sp)                                \n"
+//         "        sd          a3,   8(sp)                                \n"
+//         "        sd          a4,  16(sp)                                \n"
+//         "        sd          a5,  24(sp)                                \n" : : "i"((Memory_Map::BOOT_STACK - 32) >> 12), "i"((Memory_Map::BOOT_STACK - 32) && 0xfff));
+// }
 
-    CPU::Reg id = CPU::mcause();
+//     CPU::Reg id = CPU::mcause();
 
-    if((id & CLINT::INT_MASK) == CLINT::IRQ_MAC_TIMER) {
-        // MIP.MTI is a direct logic on (MTIME == MTIMECMP) and reseting the Timer (i.e. adjusting MTIMECMP) seems to be the only way to clear it
-        Timer::reset();
-        CPU::sies(CPU::STI);
-    }
+//     if((id & CLINT::INT_MASK) == CLINT::IRQ_MAC_TIMER) {
+//         // MIP.MTI is a direct logic on (MTIME == MTIMECMP) and reseting the Timer (i.e. adjusting MTIMECMP) seems to be the only way to clear it
+//         Timer::reset();
+//         CPU::sies(CPU::STI);
+//     }
 
-    CPU::Reg i = 1 << ((id & CLINT::INT_MASK) - 2);
-    if(CPU::int_enabled() && (CPU::sie() & i))
-        CPU::mips(i); // forward to supervisor mode
+//     CPU::Reg i = 1 << ((id & CLINT::INT_MASK) - 2);
+//     if(CPU::int_enabled() && (CPU::sie() & i))
+//         CPU::mips(i); // forward to supervisor mode
 
-    // Restore context
-if(Traits<CPU>::WORD_SIZE == 32) {
-    ASM("        lw          a2,   0(sp)                                \n"
-        "        lw          a3,   4(sp)                                \n"
-        "        lw          a4,   8(sp)                                \n"
-        "        lw          a5,  12(sp)                                \n");
-} else {
-    ASM("        ld          a2,   0(sp)                                \n"
-        "        ld          a3,   8(sp)                                \n"
-        "        ld          a4,  16(sp)                                \n"
-        "        ld          a5,  24(sp)                                \n");
-}
-    ASM("        csrr        sp, mscratch                               \n"
-        "        mret                                                   \n");
+//     // Restore context
+// if(Traits<CPU>::WORD_SIZE == 32) {
+//     ASM("        lw          a2,   0(sp)                                \n"
+//         "        lw          a3,   4(sp)                                \n"
+//         "        lw          a4,   8(sp)                                \n"
+//         "        lw          a5,  12(sp)                                \n");
+// } else {
+//     ASM("        ld          a2,   0(sp)                                \n"
+//         "        ld          a3,   8(sp)                                \n"
+//         "        ld          a4,  16(sp)                                \n"
+//         "        ld          a5,  24(sp)                                \n");
+// }
+//     ASM("        csrr        sp, mscratch                               \n"
+//         "        mret                                                   \n");
 }

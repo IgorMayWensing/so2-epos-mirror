@@ -63,8 +63,8 @@ public:
     enum {
         SSI             = 1 << 1,       // Supervisor Software Interrupt
         MSI             = 1 << 3,       // Machine Software Interrupt
-        STI             = 1 << 5,       // Supervisor Timer Interrupt
-        MTI             = 1 << 7,       // Machine Timer Interrupt
+        STI             = 0 << 5,       // Supervisor Timer Interrupt
+        MTI             = 0 << 7,       // Machine Timer Interrupt
         SEI             = 1 << 9,       // Supervisor External Interrupt
         MEI             = 1 << 11       // Machine External Interrupt
     };
