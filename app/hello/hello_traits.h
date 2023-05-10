@@ -21,6 +21,7 @@ template<> struct Traits<Build>: public Traits_Tokens
     static const bool enabled = true;
     static const bool monitored = true;
     static const bool debugged = true;
+    // static const bool hysterically_debugged = true;
     static const bool hysterically_debugged = false;
 
     // Default aspects
@@ -34,7 +35,9 @@ template<> struct Traits<Debug>: public Traits<Build>
     static const bool error   = true;
     static const bool warning = true;
     static const bool info    = false;
+    // static const bool info    = true;
     static const bool trace   = false;
+    // static const bool trace   = true;
 };
 
 template<> struct Traits<Lists>: public Traits<Build>
@@ -123,7 +126,7 @@ template<> struct Traits<Thread>: public Traits<Build>
     static const bool simulate_capacity = false;
     static const unsigned int QUANTUM = 10000; // us
 
-    typedef RR Criterion;
+    typedef FCFS Criterion;
 };
 
 template<> struct Traits<Scheduler<Thread>>: public Traits<Build>

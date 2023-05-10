@@ -481,6 +481,7 @@ struct Traits {
     static const bool monitored = false;
     static const bool debugged = true;
     static const bool hysterically_debugged = false;
+    // static const bool hysterically_debugged = true;
 
     typedef ALIST<> ASPECTS;
 };

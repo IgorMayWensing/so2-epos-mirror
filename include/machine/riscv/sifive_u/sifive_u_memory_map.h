@@ -22,7 +22,7 @@ public:
         MIO_BASE        = Traits<Machine>::MIO_BASE,
         MIO_TOP         = Traits<Machine>::MIO_TOP,
         LAST_PAGE       = RAM_TOP + 1 - 4096,
-        INT_M2S         = Traits<Machine>::RAM_TOP,   		// with multitasking, the last page is used by the _int_m2s() machine mode interrupt forwarder installed by SETUP before going into supervisor mode; code and stack share the same page, with code at the bottom and the stack at the top
+        INT_M2S         = LAST_PAGE,   		// with multitasking, the last page is used by the _int_m2s() machine mode interrupt forwarder installed by SETUP before going into supervisor mode; code and stack share the same page, with code at the bottom and the stack at the top
         FLAT_MEM_MAP    = LAST_PAGE,       	// in LIBRARY mode, the last page is used for a single-level mapping of the whole memory space
         BOOT_STACK      = LAST_PAGE - Traits<Machine>::STACK_SIZE, // will be used as the stack's base, not the stack pointer
         FREE_BASE       = RAM_BASE,

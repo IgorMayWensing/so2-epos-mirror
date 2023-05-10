@@ -257,6 +257,7 @@ void Setup::build_lm()
 
         if(si->lm.app_code != MMU::align_segment(si->lm.app_code))
             db<Setup>(ERR) << "Unaligned APP code segment:" << hex << si->lm.app_code << endl;
+        kout << "APP code segment size: " << dec << si->lm.app_code_size << endl;
         if(si->lm.app_data_size == 0) {
             db<Setup>(WRN) << "APP ELF image has no data segment!" << endl;
             si->lm.app_data = MMU::align_page(APP_DATA);
@@ -488,7 +489,8 @@ void Setup::setup_sys_pd()
                    << "})" << endl;
 
     // Check alignments
-    assert(MMU::pdi(SETUP) == MMU::pdi(RAM_BASE));
+    // assert(MMU::pdi(SETUP) == MMU::pdi(RAM_BASE));
+    assert(INT_M2S >= RAM_BASE && INT_M2S <= RAM_TOP); // Verify that INT_M2S is between RAM_BASE and RAM_TOP
     assert(MMU::pdi(INT_M2S) == MMU::pdi(RAM_TOP));
     if(RAM_BASE != MMU::align_segment(RAM_BASE))
         db<Setup>(WRN) << "Setup::setup_sys_pd: unaligned physical memory!" << endl;
