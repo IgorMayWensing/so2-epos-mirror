@@ -451,10 +451,10 @@ void Setup::setup_app_pt()
     // APPLICATION code
     // Since load_parts() will load the code into memory, the code segment can't be marked R/O yet
     // The correct flags (APPC and APPD) will be configured after the execution of load_parts(), by adjust_perms()
-    app_code_pt->remap(si->pmm.app_code, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::APP);
+    app_code_pt->remap(si->pmm.app_code, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::SYS);
 
     // APPLICATION data (contains stack, heap and extra)
-    app_data_pt->remap(si->pmm.app_data, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::APP);
+    app_data_pt->remap(si->pmm.app_data, MMU::pti(si->lm.app_data), MMU::pti(si->lm.app_data) + MMU::pages(si->lm.app_data_size), Flags::SYS);
 
     for(unsigned int i = 0; i < MMU::pts(MMU::pages(si->lm.app_code_size)); i++)
         db<Setup>(INF) << "APPC_PT[" << &app_code_pt[i] << "]=" << app_code_pt[i] << endl;
