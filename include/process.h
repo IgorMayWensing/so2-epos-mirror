@@ -168,6 +168,28 @@ public:
     : _as (new (SYSTEM) Address_Space), _cs(cs), _ds(ds), _code(_as->attach(_cs, code)), _data(_as->attach(_ds, data)), _entry(entry) {
         db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
     }
+
+    template<typename ... Tn>
+    Task(Segment *cs, Segment *ds)
+    {
+        _as = new (SYSTEM) Address_Space();
+        db<Task>(TRC) << "Task->_as" << _as << endl;
+
+        _cs = cs;
+        db<Task>(TRC) << "Task->_cs" << _cs << endl;
+
+        _ds = ds;
+        db<Task>(TRC) << "Task->_ds" << _ds << endl;
+
+        _code = _as->attach(_cs, Memory_Map::APP_CODE);
+        db<Task>(TRC) << "Task->_code" << _code << endl;
+
+        _data = _as->attach(_ds, Memory_Map::APP_DATA);
+        db<Task>(TRC) << "Task->_data" << _data << endl;
+
+        db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
+    }
+
     
     template<typename ... Tn>
     Task(const Thread::Configuration & conf, Segment * cs, Segment * ds, Log_Addr code, Log_Addr data, int (* entry)(Tn ...), Tn ... an)

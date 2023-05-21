@@ -1,6 +1,6 @@
 #include <utility/ostream.h>
 
-using namespace EPOS;
+using namespace EPOS::S::U;
 
 OStream cout;
 

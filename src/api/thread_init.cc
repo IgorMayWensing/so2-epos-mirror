@@ -35,6 +35,31 @@ void Thread::init()
 
 #endif
 
+    Criterion::init();
+
+    if(Traits<System>::multitask) {
+      // Address_Space * as = new (SYSTEM) Address_Space(MMU::current());
+      Segment * cs = new ((void*)Memory_Map::APP_CODE) Segment(64 * 1024, MMU::Page_Flags::A);
+      Segment * ds = new ((void*)Memory_Map::APP_DATA) Segment(64 * 1024, MMU::Page_Flags::D);
+      Task * app_task =  new (SYSTEM) EPOS::S::Task(cs, ds);
+
+      db<Setup>(TRC) << "app_task = " << hex << app_task << endl;
+      app_task->activate();
+
+      new (SYSTEM) Thread(Thread::Configuration(Thread::RUNNING, Thread::MAIN), reinterpret_cast<int (*)()>(main));
+
+      // We need to be in the AS of the first thread.
+      db<Init, Thread>(TRC) << "Task::activate()" << endl;
+    //   Task::activate(Thread::self()->_task);
+
+    } else {
+      // If EPOS is a library, then adjust the application entry point to __epos_app_entry,
+      // which will directly call main(). In this case, _init will already have been called,
+      // before Init_Application to construct MAIN's global objects.
+      new (SYSTEM) Thread(Thread::Configuration(Thread::RUNNING, Thread::MAIN), reinterpret_cast<int (*)()>(main));
+    }
+
+
     // Idle thread creation does not cause rescheduling (see Thread::constructor_epilogue)
     new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::IDLE), &Thread::idle);
 

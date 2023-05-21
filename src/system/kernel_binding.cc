@@ -1,3 +1,4 @@
+#include <system.h>
 // EPOS Kernel Binding
 
 __BEGIN_SYS

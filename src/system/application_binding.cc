@@ -4,6 +4,7 @@
 #include <utility/ostream.h>
 #include <architecture/cpu.h>
 #include <system.h>
+#include <process.h>
 
 // Global objects
 __BEGIN_SYS
@@ -13,13 +14,14 @@ __END_SYS
 
 // Bindings
 extern "C" {
-    void _panic() { _API::Thread::exit(-1); }
-    void _exit(int s) { _API::Thread::exit(s); for(;;); }
+    void _panic() { _SYS::Thread::exit(-1); }
+    void _exit(int s) { _SYS::Thread::exit(s); for(;;); }
 }
 
 __USING_SYS;
 extern "C" {
-    void _syscall(void * m) { CPU::syscall(m); }
+    // void _syscall(void * m) { CPU::syscall(m); }
+    void _syscall(void * m) {}
     void _print(const char * s);
     void _print_preamble() {}
     void _print_trailler(bool error) { if(error) _exit(-1); }
