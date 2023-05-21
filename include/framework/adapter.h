@@ -40,32 +40,32 @@ public:
 
     static const Adapter<Component> * self() { static_enter(); const Adapter<Component> * res = reinterpret_cast<const Adapter<Component> *>(Component::self()); return res; }
 
-    const Id & id() { return *this; }
+    // const Id & id() { return *this; }
 
-    static Adapter * get(const Id & id) {
-        static_enter();
-        Adapter * obj = Scenario<Component>::get(id);
-        static_leave();
-        return obj;
-    }
+    // static Adapter * get(const Id & id) {
+    //     static_enter();
+    //     Adapter * obj = Scenario<Component>::get(id);
+    //     static_leave();
+    //     return obj;
+    // }
 
-    static Adapter * share(const Id & id) {
-        static_enter();
-        Adapter * obj = Scenario<Component>::share(id);
-        static_leave();
-        return obj;
-    }
+    // static Adapter * share(const Id & id) {
+    //     static_enter();
+    //     Adapter * obj = Scenario<Component>::share(id);
+    //     static_leave();
+    //     return obj;
+    // }
 
-    static Adapter * share(Adapter * adapter) {
-        static_enter();
-        Adapter * obj = Scenario<Component>::share(adapter);
-        static_leave();
-        return obj;
-    }
+    // static Adapter * share(Adapter * adapter) {
+    //     static_enter();
+    //     Adapter * obj = Scenario<Component>::share(adapter);
+    //     static_leave();
+    //     return obj;
+    // }
 
     // Process management
-    void suspend() { enter(); Component::suspend(); leave(); }
-    void resume() { enter(); Component::resume(); leave(); }
+    // void suspend() { enter(); Component::suspend(); leave(); }
+    // void resume() { enter(); Component::resume(); leave(); }
     int join() { enter(); int res = Component::join(); leave(); return res; }
     void pass() { enter(); Component::pass(); leave(); }
     static void yield() { static_enter(); Component::yield(); static_leave(); }
