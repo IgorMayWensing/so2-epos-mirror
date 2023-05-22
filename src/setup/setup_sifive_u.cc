@@ -9,6 +9,14 @@
 #include <utility/elf.h>
 #include <utility/string.h>
 
+namespace EPOS {
+namespace S {
+
+bool has_virtual_memory = false;
+
+} // namespace S
+} // namespace EPOS
+
 extern "C" {
     void _start();
 
@@ -193,11 +201,11 @@ void Setup::build_lm()
     db<Setup>(TRC) << "Setup::build_lm()" << endl;
 
     // Get boot image structure
-    si->lm.has_stp = (si->bm.setup_offset != -1u);
-    si->lm.has_ini = (si->bm.init_offset != -1u);
-    si->lm.has_sys = (si->bm.system_offset != -1u);
-    si->lm.has_app = (si->bm.application_offset != -1u);
-    si->lm.has_ext = (si->bm.extras_offset != -1u);
+    si->lm.has_stp = (si->bm.setup_offset != -1ul);
+    si->lm.has_ini = (si->bm.init_offset != -1ul);
+    si->lm.has_sys = (si->bm.system_offset != -1ul);
+    si->lm.has_app = (si->bm.application_offset != -1ul);
+    si->lm.has_ext = (si->bm.extras_offset != -1ul);
 
     // Check SETUP integrity and get the size of its segments
     if(si->lm.has_stp) {
@@ -208,12 +216,32 @@ void Setup::build_lm()
     }
 
     // Check INIT integrity and get the size of its segments
+    // si->lm.ini_entry = 0;
+    // si->lm.ini_segments = 0;
+    // si->lm.ini_code = ~0U;
+    // si->lm.ini_code_size = 0;
+    // si->lm.ini_data = ~0U;
+    // si->lm.ini_data_size = 0;
     if(si->lm.has_ini) {
         ELF * ini_elf = reinterpret_cast<ELF *>(&bi[si->bm.init_offset]);
         if(!ini_elf->valid())
             db<Setup>(ERR) << "INIT ELF image is corrupted!" << endl;
 
         ini_elf->scan(reinterpret_cast<ELF::Loadable *>(&si->lm.ini_entry), INIT, INIT + 64 * 1024, 0, 0);
+
+        // si->lm.ini_entry = ini_elf->entry();
+        // si->lm.ini_segments = ini_elf->segments();
+        // si->lm.ini_code = ini_elf->segment_address(0);
+        // si->lm.ini_code_size = ini_elf->segment_size(0);
+        // if(ini_elf->segments() > 1) {
+        //     for(unsigned int i = 1; i < ini_elf->segments(); i++) {
+        //         if(ini_elf->segment_type(i) != PT_LOAD)
+        //             continue;
+        //         if(ini_elf->segment_address(i) < si->lm.ini_data)
+        //             si->lm.ini_data = ini_elf->segment_address(i);
+        //         si->lm.ini_data_size += ini_elf->segment_size(i);
+        //     }
+        // }
     }
 
     // Check SYSTEM integrity and get the size of its segments
@@ -296,6 +324,9 @@ void Setup::build_pmm()
     // System Page Table
     si->pmm.sys_pt = MMU::calloc(MMU::pts(MMU::pages(SYS_HIGH - SYS)));
 
+    // Init Page Table
+    si->pmm.ini_pt = MMU::calloc(MMU::pts(MMU::pages(SYS - INIT)));
+
     // Page tables to map the whole physical memory
     // = NP/NPTE_PT * sizeof(Page)
     //   NP = size of physical memory in pages
@@ -326,6 +357,12 @@ void Setup::build_pmm()
     // SYSTEM stack segment
     si->pmm.sys_stack = MMU::alloc(MMU::pages(si->lm.sys_stack_size));
 
+    // INIT code segment
+    si->pmm.ini_code = MMU::alloc(MMU::pages(si->lm.ini_code_size));
+
+    // INIT data segment
+    si->pmm.ini_data = MMU::alloc(MMU::pages(si->lm.ini_data_size));
+
     // The memory allocated so far will "disappear" from the system as we set usr_mem_top as follows:
     si->pmm.usr_mem_base = si->bm.mem_base;
     si->pmm.usr_mem_top = si->bm.mem_base + MMU::allocable() * sizeof(Page);
@@ -337,6 +374,8 @@ void Setup::build_pmm()
     si->pmm.app_data = MMU::alloc(MMU::pages(si->lm.app_data_size));
 
     // Free chunks (passed to MMU::init) must be defined after setup_sys_pd, since attaching implicitly allocates attachers.
+    // si->pmm.free1_base = si->lm.has_ext ? si->lm.app_extra + si->lm.app_extra_size : si->lm.app_data + si->lm.app_data_size;
+    // si->pmm.free1_top = si->pmm.free1_base + MMU::allocable() * sizeof(Page);
 
     // Test if we didn't overlap SETUP and the boot image
     if(si->pmm.usr_mem_top <= si->lm.stp_code + si->lm.stp_code_size + si->lm.stp_data_size)
@@ -401,6 +440,7 @@ void Setup::setup_sys_pt()
 
     // Get the physical address for the SYSTEM Page Table, which was allocated with calloc()
     Page_Table * sys_pt = reinterpret_cast<Page_Table *>(si->pmm.sys_pt);
+    Page_Table * ini_pt = reinterpret_cast<Page_Table *>(si->pmm.ini_pt);
 
     // System Info
     sys_pt->remap(si->pmm.sys_info, MMU::pti(SYS, SYS_INFO), MMU::pti(SYS, SYS_INFO) + 1, Flags::SYS);
@@ -416,6 +456,12 @@ void Setup::setup_sys_pt()
 
     // SYSTEM data
     sys_pt->remap(si->pmm.sys_data, MMU::pti(SYS, SYS_DATA), MMU::pti(SYS, SYS_DATA) + MMU::pages(si->lm.sys_data_size), Flags::SYS);
+
+    // INIT code
+    ini_pt->remap(si->pmm.ini_code, MMU::pti(si->lm.ini_code), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_code_size), Flags::SYS);
+
+    // INIT data
+    ini_pt->remap(si->pmm.ini_data, MMU::pti(si->lm.ini_data), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_data_size), Flags::SYS);
 
     // SYSTEM stack (used only during init and for the ukernel model)
     sys_pt->remap(si->pmm.sys_stack, MMU::pti(SYS, SYS_STACK), MMU::pti(SYS, SYS_STACK) + MMU::pages(si->lm.sys_stack_size), Flags::SYS);
@@ -523,6 +569,11 @@ void Setup::setup_sys_pd()
     if(dir.attach(os, SYS) != SYS)
         db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach the OS at " << reinterpret_cast<void *>(SYS) << "!" << endl;
 
+    // Attach the INIT (i.e. ini_pt)
+    Chunk init(si->pmm.ini_pt, MMU::pti(INIT), MMU::pti(INIT) + MMU::pages(si->lm.ini_code_size + si->lm.ini_data_size), Flags::SYS);
+    if(dir.attach(init, INIT) != INIT)
+        db<Setup>(ERR) << "Setup::setup_init_pd: cannot attach the OS at " << reinterpret_cast<void *>(INIT) << "!" << endl;
+
     // Attach the first APPLICATION CODE (i.e. app_code_pt)
     Chunk app_code(si->pmm.app_code_pt, MMU::pti(si->lm.app_code), MMU::pti(si->lm.app_code) + MMU::pages(si->lm.app_code_size), Flags::APPC);
     if(dir.attach(app_code, si->lm.app_code) != si->lm.app_code)
@@ -559,6 +610,7 @@ void Setup::enable_paging()
 
     // Set SATP and enable paging
     MMU::pd(multitask ? si->pmm.sys_pd : FLAT_MEM_MAP);
+    has_virtual_memory = true;
 
     // Flush TLB to ensure we've got the right memory organization
     MMU::flush_tlb();
