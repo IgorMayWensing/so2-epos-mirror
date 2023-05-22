@@ -461,7 +461,7 @@ void Setup::setup_sys_pt()
     ini_pt->remap(si->pmm.ini_code, MMU::pti(si->lm.ini_code), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_code_size), Flags::SYS);
 
     // INIT data
-    ini_pt->remap(si->pmm.ini_data, MMU::pti(si->lm.ini_data), MMU::pti(si->lm.ini_code) + MMU::pages(si->lm.ini_data_size), Flags::SYS);
+    ini_pt->remap(si->pmm.ini_data, MMU::pti(si->lm.ini_data), MMU::pti(si->lm.ini_data) + MMU::pages(si->lm.ini_data_size), Flags::SYS);
 
     // SYSTEM stack (used only during init and for the ukernel model)
     sys_pt->remap(si->pmm.sys_stack, MMU::pti(SYS, SYS_STACK), MMU::pti(SYS, SYS_STACK) + MMU::pages(si->lm.sys_stack_size), Flags::SYS);
@@ -569,7 +569,7 @@ void Setup::setup_sys_pd()
     if(dir.attach(os, SYS) != SYS)
         db<Setup>(ERR) << "Setup::setup_sys_pd: cannot attach the OS at " << reinterpret_cast<void *>(SYS) << "!" << endl;
 
-    // Attach the INIT (i.e. ini_pt)
+    // Attach the INIT (i.e. ini_pt) 
     Chunk init(si->pmm.ini_pt, MMU::pti(INIT), MMU::pti(INIT) + MMU::pages(si->lm.ini_code_size + si->lm.ini_data_size), Flags::SYS);
     if(dir.attach(init, INIT) != INIT)
         db<Setup>(ERR) << "Setup::setup_init_pd: cannot attach the OS at " << reinterpret_cast<void *>(INIT) << "!" << endl;

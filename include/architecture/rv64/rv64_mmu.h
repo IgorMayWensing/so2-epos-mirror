@@ -271,18 +271,29 @@ public:
         void detach(const Chunk & chunk) {
             unsigned int i = 0;
             unsigned int j = 0;
+            const Page_Table * pt = chunk.pt();
+            unsigned int pts = chunk.pts();
             for(; i < PD_ENTRIES; i++) {
-                Attacher * at = _pd->log()[i];
+                Attacher * at = pde2phy(_pd->log()[i]);
                 if(at) {
-                    unsigned int ates = 0;
+                    bool empty = true;
                     for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
-                            at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                        }
+                        db<MMU>(INF) << "at=" << at << endl;
+                        db<MMU>(INF) << "at->log()=" << at->log() << endl;
+                        db<MMU>(INF) << "ate2phy(at->log()[j])=" << ate2phy(at->log()[j]) << endl;
+                        db<MMU>(INF) << "pt=" << pt << endl;
+                        if(ate2phy(at->log()[j]) == pt) {
+                            at->log()[j] = 0;
+                            pt++;
+                            pts--;
+                        } else if (at->log()[j])
+                            empty = false;
                     }
-                    if(ates == AT_ENTRIES)
+                    if(empty) {
                         _pd->log()[i] = 0;
+                        free(at);
+                    }
+                    if(!pts) break;
                 }
             }
             if((i == PD_ENTRIES) && (j == AT_ENTRIES))
@@ -292,24 +303,22 @@ public:
         }
 
         void detach(const Chunk & chunk, Log_Addr addr) {
-            unsigned int i = pdi(addr);
-            unsigned int j = ati(addr);
-            for(; i < pds(ats(chunk.pts())); i++) {
-                Attacher * at = _pd->log()[i];
-                if(at) {
-                    unsigned int ates = 0;
-                    for(j = 0; j < AT_ENTRIES; j++) {
-                        if(unflag(ate2phy((*at)[i])) == unflag(chunk.pt())) {
-                            at->log()[j & (AT_ENTRIES - 1)] = 0;
-                            ates++;
-                        } else {
-                            db<MMU>(WRN) << "MMU::Directory::detach(pt=" << chunk.pt() << ",addr=" << addr << ") failed!" << endl;
-                            return;
-                        }
-                    }
-                    if(ates == AT_ENTRIES)
-                        _pd->log()[i] = 0;
+            const Page_Table * pt = chunk.pt();
+            unsigned int j;
+            for(unsigned int i = pdi(addr); i < pdi(addr) + ats(chunk.pts()); i++) {
+                Attacher *at = pde2phy(_pd->log()[i]);
+                bool empty = true;
+                for(j = 0; j < AT_ENTRIES; j++) {
+                    if(unflag(ate2phy((*at)[j])) == unflag(pt)) {
+                        at->log()[j] = 0;
+                        pt++;
+                    } else if (at->log()[j])
+                        empty = false;
                 }
+                if(empty) {
+                    _pd->log()[i] = 0;
+                    free(at);
+                };
             }
             flush_tlb();
         }
