@@ -27,7 +27,7 @@ void Thread::init()
 
 #else
 
-    typedef int (Main)(int argc, char * argv[]);
+    typedef int (Main)();
 
     System_Info * si = System::info();
 
@@ -37,8 +37,10 @@ void Thread::init()
     Log_Addr code = si->lm.app_code;
     Log_Addr data = si->lm.app_data;
     Main * main = reinterpret_cast<Main *>(si->lm.app_entry);
+    
 
     new (SYSTEM) Task(as, cs, ds, code, data, main);
+    
 
 #endif
 

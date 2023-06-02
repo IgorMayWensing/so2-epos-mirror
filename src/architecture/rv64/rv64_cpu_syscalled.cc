@@ -8,13 +8,13 @@ __BEGIN_SYS
 
 #ifdef __kernel__
 
-void CPU::syscalled(unsigned int int_id);
+void CPU::syscalled(unsigned int int_id){}
 
 #endif
 
 #ifndef __library__
 
-void CPU::Context::first_dispatch();
+void CPU::Context::first_dispatch(){}
 
 #endif
 
