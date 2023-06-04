@@ -131,3 +131,7 @@ dist: veryclean
 		$(CLEAN) $(ETC)/license.as
 
 FORCE:
+
+# b rv64_cpu.cc:EPOS::S::CPU::Context::load() const volatile
+# b rv64_cpu.h:377
+# b riscv_ic.cc:67
