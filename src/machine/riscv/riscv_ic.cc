@@ -23,13 +23,12 @@ void IC::entry()
 
     // Entry-point for the dummy contexts used by the first dispatching of newly created threads
     ASM("       .global _int_leave              \n"
-        "_int_leave:                            \n"
-        "1:                                     \n");
+        "_int_leave:                            \n");
 if(Traits<IC>::hysterically_debugged) {
     ASM("       jalr    %0                      \n" : : "r"(print_context));
 }
-
     // Restore context
+    ASM("1:                                     \n");
     CPU::Context::pop(true);
     CPU::iret();
 }
@@ -74,7 +73,7 @@ void IC::exception(Interrupt_Id id)
 
     if((id == CPU::EXC_IPF) && (epc == CPU::Log_Addr(&__exit))) { // a page fault on __exit is triggered by MAIN after returing to CRT0
         db<IC, Thread>(TRC) << " => Thread::exit()";
-        CPU::a0(a0);
+        //CPU::a0(a0);
         __exit();
     } else {
         db<IC,System>(WRN) << "IC::Exception(" << id << ") => {" << hex << "thread=" << thread << ",epc=" << epc << ",sp=" << sp << ",status=" << status << ",cause=" << cause << ",tval=" << tval << "}" << dec;
