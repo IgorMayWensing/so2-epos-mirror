@@ -331,13 +331,13 @@ public:
     using CPU_Common::ntohs;
 
     template<typename ... Tn>
-    static Context * init_stack(Log_Addr usp, Log_Addr ksp, void (* exit)(), int (* entry)(Tn ...), Tn ... an) {
-        ksp -= sizeof(Context);
-        Context * ctx = new(ksp) Context(entry, exit, usp); // init_stack is called with usp = 0 for kernel threads
+    static Context * init_stack(Log_Addr usp, Log_Addr sp, void (* exit)(), int (* entry)(Tn ...), Tn ... an) {
+        sp -= sizeof(Context);
+        Context * ctx = new(sp) Context(entry, exit, usp); // init_stack is called with usp = 0 for kernel threads
         init_stack_helper(&ctx->_x10, an ...); // x10 is a0
-        ksp -= sizeof(Context);
-        ctx = new(ksp) Context(&_int_leave, 0, 0); // this context will be popped by switch() to reach _int_leave(), which will activate the thread's context
-        ctx->_x10 = 0; // zero fr() for the pop(true) issued by _int_leave()
+        sp -= sizeof(Context);
+        ctx = new(sp) Context(&_int_leave, 0, 0);
+        ctx->_x10 = 0;
         return ctx;
     }
 
@@ -467,7 +467,6 @@ private:
 inline void CPU::Context::push(bool interrupt)
 {
 if(interrupt && multitask) {
-    // swap(ksp, usp)
     ASM("       csrr    x3, sstatus             \n"
         "       andi    x3, x3, 1 << 8          \n"
         "       bne     x3, zero, 1f            \n"
@@ -479,7 +478,7 @@ if(interrupt && multitask) {
     ASM("       addi    sp, sp, %0              \n" : : "i"(-sizeof(Context))); // adjust sp for the pushes below
 
 if(multitask)
-    ASM("       csrr    x3, sscratch            \n"     // sscratch = usp (sscratch holds ksp in user-land and usp in kernel; usp = 0 for kernel threads)
+    ASM("       csrr    x3, sscratch            \n"     
         "       sd      x3,     0(sp)           \n");   // push usp
 
 if(interrupt)
@@ -535,7 +534,7 @@ inline void CPU::Context::pop(bool interrupt)
 {
 if(multitask) {
     ASM("       ld       x3, 0(sp)              \n"     // pop usp
-        "       csrw     sscratch, x3           \n");   // sscratch = usp (sscratch holds ksp in user-land and usp in kernel; usp = 0 for kernel threads)
+        "       csrw     sscratch, x3           \n");   
 }
     ASM("       ld       x3, 8(sp)              \n");   // pop pc
 if(interrupt)
@@ -585,7 +584,6 @@ if(!interrupt & !multitask)
         "       csrs    mstatus, x3             \n");   // mstatus.MPP is automatically cleared on mret, so we reset it to MPP_M here
 
 if(multitask && interrupt)
-    // swap(ksp, usp)
     ASM("       andi    x3, x3, 1 << 8          \n"
         "       bne     x3, zero, 1f            \n"
         "       csrr    x3, sscratch            \n"
