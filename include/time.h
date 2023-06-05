@@ -5,8 +5,10 @@
 
 #include <machine/rtc.h>
 #include <machine/timer.h>
+#include <process.h>
 #include <utility/queue.h>
 #include <utility/handler.h>
+#include <utility/spin.h>
 
 __BEGIN_SYS
 
@@ -29,8 +31,13 @@ public:
 
 class Alarm
 {
-    friend class System;
-    friend class Alarm_Chronometer;
+    friend class System;                        // for init()
+    template<typename> friend class Clerk;      // for elapsed()
+    friend class Alarm_Chronometer;             // for elapsed()
+    friend class Periodic_Thread;               // for ticks() and elapsed()
+    friend class RT_Thread;                     // for ticks() and elapsed()
+    friend class FCFS;                          // for ticks() and elapsed()
+    friend class EDF;                           // for ticks() and elapsed()
 
 private:
     typedef Timer_Common::Tick Tick;
@@ -50,17 +57,19 @@ public:
     static void delay(const Microsecond & time);
 
 private:
-    static void init();
+    unsigned int times() const { return _times; }
 
     static volatile Tick & elapsed() { return _elapsed; }
 
     static Microsecond timer_period() { return 1000000 / frequency(); }
     static Tick ticks(const Microsecond & time) { return (time + timer_period() / 2) / timer_period(); }
 
-    static void lock();
-    static void unlock();
+    static void lock() { Thread::lock(&_lock); }
+    static void unlock() { Thread::unlock(&_lock); }
 
     static void handler(IC::Interrupt_Id i);
+
+    static void init();
 
 private:
     Microsecond _time;
@@ -72,6 +81,7 @@ private:
     static Alarm_Timer * _timer;
     static volatile Tick _elapsed;
     static Queue _request;
+    static Spin _lock;
 };
 
 
@@ -152,7 +162,7 @@ private:
     Time_Stamp _stop;
 };
 
-class Chronometer: public IF<Traits<TSC>::enabled, TSC_Chronometer, Alarm_Chronometer>::Result {};
+class Chronometer: public IF<Traits<TSC>::enabled && !Traits<System>::multicore, TSC_Chronometer, Alarm_Chronometer>::Result {};
 
 __END_SYS
 

@@ -1,6 +1,7 @@
 // EPOS Application Scaffold and Application Component Implementation
 
 #include <system.h>
+#include <network.h>
 
 __BEGIN_SYS
 
@@ -19,3 +20,12 @@ OStream cerr;
 
 __END_API
 
+extern "C" {
+    void __pre_main() {
+
+#ifdef __NIC_H
+        if(_SYS::Traits<_SYS::Network>::enabled)
+            _SYS::Network::init();
+#endif
+    }
+}

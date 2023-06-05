@@ -4,6 +4,20 @@
 
 __BEGIN_SYS
 
+void Machine::pre_init(System_Info * si)
+{
+    // Usually BSP gets here later than other cores, so CPU::smp_barrier_init() must be idempotent
+    if(Traits<System>::multicore)
+        CPU::smp_barrier_init(si->bm.n_cpus);
+
+    CPU::smp_barrier();
+
+    if(CPU::id() == 0)
+        Display::init();
+
+    db<Init, Machine>(TRC) << "Machine::pre_init()" << endl;
+}
+
 void Machine::init()
 {
     db<Init, Machine>(TRC) << "Machine::init()" << endl;
@@ -17,6 +31,11 @@ void Machine::init()
     if(Traits<PCI>::enabled)
         PCI::init();
 
+#ifdef __SCRATCHPAD_H
+    if(Traits<Scratchpad>::enabled)
+        Scratchpad::init();
+#endif
+
 #ifdef __KEYBOARD_H
     if(Traits<Keyboard>::enabled)
         Keyboard::init();
@@ -25,6 +44,11 @@ void Machine::init()
 #ifdef __FPGA_H
     if(Traits<FPGA>::enabled)
         FPGA::init();
+#endif
+
+#if defined (__NIC_H) && defined (__ethernet__)
+    if(Traits<Ethernet>::enabled)
+        Initializer<Ethernet>::init();
 #endif
 }
 

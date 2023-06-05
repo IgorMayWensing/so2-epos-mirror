@@ -3,7 +3,7 @@
 #ifndef __emote3_nic_h
 #define __emote3_nic_h
 
-#include "emote3_cc2538.h"
+#include "emote3_ieee802_15_4.h"
 #include <machine/cortex/engine/m95.h>
 
 #endif

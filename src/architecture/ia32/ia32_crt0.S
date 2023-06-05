@@ -13,6 +13,7 @@ _start:
         .globl      __epos_app_entry
         .type   __epos_app_entry,@function
 __epos_app_entry:
+        call        __pre_main
         call        main
         push        %eax        // save main's return value to be used by exit()
         call        _fini

@@ -15,7 +15,18 @@ void IC::dispatch(unsigned int i)
         if((i != INT_SYS_TIMER) || Traits<IC>::hysterically_debugged)
             db<IC>(TRC) << "IC::dispatch(i=" << i << ")" << endl;
 
+        // The code bellow aims to fix an old problem with the network stack (and other interrupt driven subsystems).
+        // If the propagation of an interrupt up the stack causes a thread rescheduling (e.g. a TCP segment is delivered to a blocked application)
+        // the ISR, even the reentrant ones, might hold resources (e.g. network buffers) indefinitely.
+        // Raising the running thread's priority to a ceiling or to a value which allows preemption only by higher priority threads is an old and straightforward
+        // solution!
+
+        Thread::Criterion c;
+        if((i != IC::INT_SYS_TIMER) && (i != IC::INT_IPI))
+            c = Thread::self()->begin_isr(i);
         _int_vector[i](i);
+        if((i != IC::INT_SYS_TIMER) && (i != IC::INT_IPI))
+            Thread::self()->end_isr(i, c);
     } else {
         if(i != INT_LAST_HARD)
             db<IC>(TRC) << "IC::spurious interrupt (" << i << ")" << endl;

@@ -42,13 +42,7 @@ extern "C" {
     }
 
     // Heap
-    static Spin _heap_spin;
-    void _heap_lock() {
-        _heap_spin.acquire();
-        CPU::int_disable();
-    }
-    void _heap_unlock() {
-        _heap_spin.release();
-        CPU::int_enable();
-    }
+    static Spin _heap_lock;
+    void _lock_heap() { Thread::lock(&_heap_lock); }
+    void _unlock_heap() { Thread::unlock(&_heap_lock); }
 }
