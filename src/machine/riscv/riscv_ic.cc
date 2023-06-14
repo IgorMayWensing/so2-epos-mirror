@@ -12,6 +12,9 @@ extern "C" { static void print_context(); }
 
 __BEGIN_SYS
 
+static CPU::Reg a0;
+static CPU::Reg a1;
+
 IC::Interrupt_Handler IC::_int_vector[IC::INTS];
 
 void IC::entry()
@@ -23,13 +26,12 @@ void IC::entry()
 
     // Entry-point for the dummy contexts used by the first dispatching of newly created threads
     ASM("       .global _int_leave              \n"
-        "_int_leave:                            \n"
-        "1:                                     \n");
+        "_int_leave:                            \n");
 if(Traits<IC>::hysterically_debugged) {
     ASM("       jalr    %0                      \n" : : "r"(print_context));
 }
-
     // Restore context
+    ASM("1:                                     \n");
     CPU::Context::pop(true);
     CPU::iret();
 }
@@ -37,6 +39,8 @@ if(Traits<IC>::hysterically_debugged) {
 void IC::dispatch()
 {
     Interrupt_Id id = int_id();
+    a0 = CPU::a0(); // exit passes status through a0
+    a1 = CPU::a1(); // syscalls pass messages through a1
 
     if(((id != INT_SYS_TIMER) && (id != INT_SYSCALL) && ((id == CPU::EXC_IPF) && (CPU::epc() != CPU::Log_Addr(&__exit)))) || Traits<IC>::hysterically_debugged)
         db<IC>(TRC) << "IC::dispatch(i=" << id << ") [sp=" << CPU::sp() << "]" << endl;
@@ -49,11 +53,11 @@ void IC::dispatch()
         if(id == INT_SYS_TIMER)
             Timer::reset();
     }
-
+    CPU::a1(a1);
     _int_vector[id](id);
 
     if(id >= EXCS)
-        CPU::fr(0); // tell CPU::Context::pop(true) not to increment PC since it is automatically incremented for hardware interrupts
+        CPU::a0(0); // tell CPU::Context::pop(true) not to increment PC since it is automatically incremented for hardware interrupts
 }
 
 void IC::int_not(Interrupt_Id id)
@@ -129,7 +133,7 @@ void IC::exception(Interrupt_Id id)
             db<IC, System>(ERR) << "Exception stopped execution due to hysterically debugging!" << endl;
     }
 
-    CPU::fr(4); // since exceptions do not increment PC, tell CPU::Context::pop(true) to perform PC = PC + 4 on return
+    CPU::a0(4); // since exceptions do not increment PC, tell CPU::Context::pop(true) to perform PC = PC + 4 on return
 }
 
 __END_SYS
@@ -137,6 +141,6 @@ __END_SYS
 static void print_context() {
     __USING_SYS
     db<IC, System>(TRC) << "IC::leave:ctx=" << /**static_cast<CPU::Context *>(CPU::sp() + 32) << */endl;
-    CPU::fr(0);
+    CPU::a0(0);
 }
 
