@@ -1,0 +1,1482 @@
+diff --git a/app/philosophers_dinner/philosophers_dinner.cc b/app/philosophers_dinner/philosophers_dinner.cc
+index 5fa4397..26be413 100644
+--- a/app/philosophers_dinner/philosophers_dinner.cc
++++ b/app/philosophers_dinner/philosophers_dinner.cc
+@@ -33,6 +33,10 @@ int main()
+     phil[2] = new Thread(&philosopher, 2, 16, 39);
+     phil[3] = new Thread(&philosopher, 3, 16, 24);
+     phil[4] = new Thread(&philosopher, 4, 10, 20);
++    phil[4] = new Thread(&philosopher, 5, 10, 20);
++    phil[4] = new Thread(&philosopher, 6, 10, 20);
++    phil[4] = new Thread(&philosopher, 7, 10, 20);
++    phil[4] = new Thread(&philosopher, 8, 10, 20);
+ 
+     cout << "Philosophers are alive and hungry!" << endl;
+ 
+diff --git a/app/philosophers_dinner/philosophers_dinner_traits.h b/app/philosophers_dinner/philosophers_dinner_traits.h
+index eadb05d..0393cca 100644
+--- a/app/philosophers_dinner/philosophers_dinner_traits.h
++++ b/app/philosophers_dinner/philosophers_dinner_traits.h
+@@ -128,7 +128,7 @@ template<> struct Traits<Thread>: public Traits<Build>
+     static const bool simulate_capacity = false;
+     static const unsigned int QUANTUM = 10000; // us
+ 
+-    typedef RR Criterion;
++    typedef mySched Criterion;
+ };
+ 
+ template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
+diff --git a/app/producer_consumer/producer_consumer_traits.h b/app/producer_consumer/producer_consumer_traits.h
+index 6878946..1415cf0 100644
+--- a/app/producer_consumer/producer_consumer_traits.h
++++ b/app/producer_consumer/producer_consumer_traits.h
+@@ -128,7 +128,7 @@ template<> struct Traits<Thread>: public Traits<Build>
+     static const bool simulate_capacity = false;
+     static const unsigned int QUANTUM = 10000; // us
+ 
+-    typedef FCFS Criterion;
++    typedef Priority Criterion;
+ };
+ 
+ template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
+diff --git a/app/task_test/makefile b/app/task_test/makefile
+new file mode 100644
+index 0000000..8a6578a
+--- /dev/null
++++ b/app/task_test/makefile
+@@ -0,0 +1,17 @@
++# EPOS Application Makefile
++
++include ../../makedefs
++
++all: install
++
++$(APPLICATION):	$(APPLICATION).o $(LIB)/*
++		$(ALD) $(ALDFLAGS) -o $@ $(APPLICATION).o
++
++$(APPLICATION).o: $(APPLICATION).cc $(SRC)
++		$(ACC) $(ACCFLAGS) -o $@ $<
++
++install: $(APPLICATION)
++		$(INSTALL) $(APPLICATION) $(IMG)
++
++clean:
++		$(CLEAN) *.o $(APPLICATION)
+diff --git a/app/task_test/task_test.cc b/app/task_test/task_test.cc
+new file mode 100644
+index 0000000..af3db6a
+--- /dev/null
++++ b/app/task_test/task_test.cc
+@@ -0,0 +1,162 @@
++// EPOS Task Test Program
++
++#include <time.h>
++#include <process.h>
++
++using namespace EPOS;
++
++const int iterations = 10;
++
++int func_a(void);
++int func_b(void);
++
++Thread * a;
++Thread * b;
++Thread * m;
++
++OStream cout;
++
++int main()
++{
++    cout << "Task test" << endl;
++
++    m = Thread::self();
++
++    Task * task0 = Task::self();
++    Address_Space * as0 = task0->address_space();
++    cout << "My address space's page directory is located at " << as0->pd() << endl;
++
++    Segment * cs0 = task0->code_segment();
++    CPU::Log_Addr code0 = task0->code();
++    cout << "My code segment is located at " << static_cast<void *>(code0) << " and it is " << cs0->size() << " bytes long" << endl;
++
++    Segment * ds0 = task0->data_segment();
++    CPU::Log_Addr data0 = task0->data();
++    cout << "My data segment is located at " << static_cast<void *>(data0) << " and it is " << ds0->size() << " bytes long" << endl;
++
++    cout << "I'll now fork a new task:" << endl;
++
++    cout << "Creating the new code segment ... ";
++    Segment * cs1 = new Segment(cs0->size());
++    cout << "done!" << endl;
++    CPU::Log_Addr code1 = as0->attach(cs1);
++    cout << "The new code segment is attached to my address space at " << code1 << endl;
++    cout << "Creating the new data segment ... ";
++    Segment * ds1 = new Segment(ds0->size());
++    cout << "done!" << endl;
++    CPU::Log_Addr data1 = as0->attach(ds1);
++    cout << "The new data segment is attached to my address space at " << data1 << endl;
++    cout << "Coping the code segment ... ";
++    memcpy(code1, code0, cs0->size());
++    cout << "done!" << endl;
++    cout << "Coping the data segment ... ";
++    memcpy(data1, data0, ds0->size());
++    cout << "done!" << endl;
++    cout << "Detaching segments from my address space ... ";
++    as0->detach(cs1);
++    as0->detach(ds1);
++    cout << "done!" << endl;
++
++    cout << "Creating the new task that will run func B ... ";
++    Task * task1 = new Task(cs1, ds1, code0, data0, &func_b);
++    b = task1->main();
++    cout << "done!" << endl;
++
++    cout << "Creating a thread to run func A ... ";
++    a = new Thread(&func_a);
++    cout << " done!" << endl;
++
++    cout << "I'll now suspend my self to see the other threads running." << endl;
++    m->suspend();
++
++    cout << "Both threads must be done by now and must have suspended themselves. I'll now wait for 1 second and then wake them up so they can exit ...";
++    Alarm::delay(Second(1));
++    a->resume();
++    b->resume();
++
++    cout << " done!" << endl;
++
++    cout << "I'll now wait for the threads to finish ... " << endl;
++    int status_a = a->join();
++    int status_b = b->join();
++    cout << " done!" << endl;
++    cout << "Thread A exited with status " << status_a << " and thread B exited with status " << status_b << "." << endl;
++
++    cout << "I'll now delete everything I have created ... ";
++    delete task1;
++    delete cs1;
++    delete ds1;
++    delete a;
++
++    cout << " done!" << endl;
++
++
++    cout << "\nI'll now repeat the test with Task(task) constructor." << endl;
++
++    cout << "Creating the new task that will run func B ... ";
++    task1 = new Task(task0, &func_b);
++    b = task1->main();
++    cout << "done!" << endl;
++
++    cout << "Creating a thread to run func A ... ";
++    a = new Thread(&func_a);
++    cout << " done!" << endl;
++
++    cout << "I'll now suspend my self to see the other threads running." << endl;
++    m->suspend();
++
++    Alarm::delay(Second(3));
++
++    cout << "Both threads must be done by now and must have suspended themselves. I'll now wait for 1 second and then wake them up so they can exit ...";
++    a->resume();
++
++    Thread::yield();
++    b->resume();
++
++    cout << " done!" << endl;
++
++    cout << "I'll now wait for the threads to finish ... " << endl;
++    status_a = a->join();
++    status_b = b->join();
++    cout << " done!" << endl;
++    cout << "Thread A exited with status " << status_a << " and thread B exited with status " << status_b << "." << endl;
++
++    cout << "I'll now delete everything I have created ... " << endl;
++    delete task1;
++    delete a;
++
++    cout << "I'm also done, bye!" << endl;
++
++    return 0;
++}
++
++
++int func_a(void)
++{
++    for(int i = iterations; i > 0; i--) {
++        for(int i = 0; i < 79; i++)
++            cout << "a";
++        cout << endl;
++        Thread::yield();
++    }
++
++    Thread::self()->suspend();
++
++    return 'A';
++}
++
++int func_b(void)
++{
++    for(int i = iterations; i > 0; i--) {
++        for(int i = 0; i < 79; i++)
++            cout << "b";
++        cout << endl;
++        Thread::yield();
++    }
++
++    m->resume();
++
++    Thread::self()->suspend();
++
++    return 'B';
++}
+diff --git a/app/task_test/task_test_traits.h b/app/task_test/task_test_traits.h
+new file mode 100644
+index 0000000..a2d1ff5
+--- /dev/null
++++ b/app/task_test/task_test_traits.h
+@@ -0,0 +1,155 @@
++#ifndef __traits_h
++#define __traits_h
++
++#include <system/config.h>
++
++__BEGIN_SYS
++
++// Build
++template<> struct Traits<Build>: public Traits_Tokens
++{
++    // Basic configuration
++    static const unsigned int MODE = KERNEL;
++    static const unsigned int ARCHITECTURE = RV64;
++    static const unsigned int MACHINE = RISCV;
++    static const unsigned int MODEL = SiFive_U;
++    static const unsigned int CPUS = 1;
++    static const unsigned int NODES = 1; // (> 1 => NETWORKING)
++    static const unsigned int EXPECTED_SIMULATION_TIME = 60; // s (0 => not simulated)
++
++    // Default flags
++    static const bool enabled = true;
++    static const bool monitored = false;
++    static const bool debugged = true;
++    static const bool hysterically_debugged = false;
++
++    // Default aspects
++    typedef ALIST<> ASPECTS;
++};
++
++
++// Utilities
++template<> struct Traits<Debug>: public Traits<Build>
++{
++    static const bool error   = true;
++    static const bool warning = true;
++    static const bool info    = false;
++    static const bool trace   = false;
++};
++
++template<> struct Traits<Lists>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Spin>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Heaps>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++template<> struct Traits<Observers>: public Traits<Build>
++{
++    // Some observed objects are created before initializing the Display
++    // Enabling debug may cause trouble in some Machines
++    static const bool debugged = false;
++};
++
++
++// System Parts (mostly to fine control debugging)
++template<> struct Traits<Boot>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Setup>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Init>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Framework>: public Traits<Build>
++{
++};
++
++template<> struct Traits<Aspect>: public Traits<Build>
++{
++    static const bool debugged = hysterically_debugged;
++};
++
++
++__END_SYS
++
++// Mediators
++#include __ARCHITECTURE_TRAITS_H
++#include __MACHINE_TRAITS_H
++
++__BEGIN_SYS
++
++
++// API Components
++template<> struct Traits<Application>: public Traits<Build>
++{
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = Traits<Machine>::HEAP_SIZE;
++    static const unsigned int MAX_THREADS = Traits<Machine>::MAX_THREADS;
++};
++
++template<> struct Traits<System>: public Traits<Build>
++{
++    static const unsigned int mode = Traits<Build>::MODE;
++    static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
++    static const bool multitask = (mode != Traits<Build>::LIBRARY);
++    static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
++
++    static const unsigned long LIFE_SPAN = 1 * YEAR; // s
++    static const unsigned int DUTY_CYCLE = 1000000; // ppm
++
++    static const bool reboot = true;
++
++    static const unsigned int STACK_SIZE = Traits<Machine>::STACK_SIZE;
++    static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
++};
++
++template<> struct Traits<Task>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multitask;
++};
++
++template<> struct Traits<Thread>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++    static const bool trace_idle = hysterically_debugged;
++    static const bool simulate_capacity = false;
++    static const unsigned int QUANTUM = 10000; // us
++
++    typedef mySched Criterion;
++};
++
++template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
++{
++    static const bool debugged = Traits<Thread>::trace_idle || hysterically_debugged;
++};
++
++template<> struct Traits<Synchronizer>: public Traits<Build>
++{
++    static const bool enabled = Traits<System>::multithread;
++};
++
++template<> struct Traits<Alarm>: public Traits<Build>
++{
++    static const bool visible = hysterically_debugged;
++};
++
++template<> struct Traits<Address_Space>: public Traits<Build> {};
++
++template<> struct Traits<Segment>: public Traits<Build> {};
++
++__END_SYS
++
++#endif
+diff --git a/include/architecture/rv64/rv64_cpu.h b/include/architecture/rv64/rv64_cpu.h
+index 31bf991..f7bc6cd 100644
+--- a/include/architecture/rv64/rv64_cpu.h
++++ b/include/architecture/rv64/rv64_cpu.h
+@@ -5,6 +5,8 @@
+ 
+ #include <architecture/cpu.h>
+ 
++extern "C" { void _int_leave(); }
++
+ __BEGIN_SYS
+ 
+ class CPU: protected CPU_Common
+@@ -102,7 +104,7 @@ public:
+         // Contexts are loaded with [m|s]ret, which gets pc from [m|s]epc and updates some bits of [m|s]status, that's why _st is initialized with [M|S]PIE and [M|S]PP
+         // Kernel threads are created with usp = 0 and have SPP_S set
+         // Dummy contexts for the first execution of each thread (both kernel and user) are created with exit = 0 and SPIE cleared (no interrupts until the second context is popped)
+-        Context(Log_Addr entry, Log_Addr exit, Log_Addr usp): _usp(usp), _pc(entry), _st(multitask ? ((exit ? SPIE : 0) | (usp ? SPP_U : SPP_S) | SUM) : ((exit ? MPIE : 0) | MPP_M)), _x1(exit) {
++        Context(Log_Addr entry, Log_Addr exit, Log_Addr usp):_usp(usp), _pc(entry), _st(multitask ? ((exit ? SPIE : 0) | (usp ? SPP_U : SPP_S) | SUM) : ((exit ? MPIE : 0) | MPP_M)), _x1(exit) {
+             if(Traits<Build>::hysterically_debugged || Traits<Thread>::trace_idle) {
+                                                                         _x5 =  5;  _x6 =  6;  _x7 =  7;  _x8 =  8;  _x9 =  9;
+                 _x10 = 10; _x11 = 11; _x12 = 12; _x13 = 13; _x14 = 14; _x15 = 15; _x16 = 16; _x17 = 17; _x18 = 18; _x19 = 19;
+@@ -158,6 +160,7 @@ public:
+         static void first_dispatch() __attribute__ ((naked));
+ 
+     private:
++        Reg _usp;     // usp (used with multitasking)
+         Reg _pc;      // pc
+         Reg _st;      // [m|s]status
+     //  Reg _x0;      // zero
+@@ -192,7 +195,6 @@ public:
+         Reg _x29;     // t4
+         Reg _x30;     // t5
+         Reg _x31;     // t6
+-        Reg _usp;     // usp (used with multitasking)
+     };
+ 
+     // Interrupt Service Routines
+@@ -329,16 +331,13 @@ public:
+     using CPU_Common::ntohs;
+ 
+     template<typename ... Tn>
+-    static Context * init_stack(Log_Addr usp, Log_Addr sp, void (* exit)(), int (* entry)(Tn ...), Tn ... an) {
+-        // Multitasking scenarios use this method with USP != 0 for application threads, what causes two contexts to be pushed into the thread's stack.
+-        // The context pushed first (and popped last) is the "regular" one, with entry pointing to the thread's entry point.
+-        // The second context (popped first) is a dummy context that has first_dispatch as entry point. It is a system-level context (CPL=0),
+-        // so switch_context doesn't need to care for cross-level IRETs.
+-
+-        // Real context
+-        sp -= sizeof(Context);
+-        Context * ctx = new(sp) Context(entry, exit, usp); // init_stack is called with usp = 0 for kernel threads
++    static Context * init_stack(Log_Addr usp, Log_Addr ksp, void (* exit)(), int (* entry)(Tn ...), Tn ... an) {
++        ksp -= sizeof(Context);
++        Context * ctx = new(ksp) Context(entry, exit, usp); // init_stack is called with usp = 0 for kernel threads
+         init_stack_helper(&ctx->_x10, an ...); // x10 is a0
++        ksp -= sizeof(Context);
++        ctx = new(ksp) Context(&_int_leave, 0, 0); // this context will be popped by switch() to reach _int_leave(), which will activate the thread's context
++        ctx->_x10 = 0; // zero fr() for the pop(true) issued by _int_leave()
+         return ctx;
+     }
+ 
+@@ -467,113 +466,132 @@ private:
+ 
+ inline void CPU::Context::push(bool interrupt)
+ {
+-    ASM("       addi     sp, sp, %0             \n" : : "i"(-sizeof(Context))); // adjust SP for the pushes below
+-if(multitask) {
+-    ASM("       csrr     x3, sscratch           \n"     // SSCRATCH holds KSP in user-land and USP in kernel (USP = 0 for kernel threads)
+-        "       sd       x3,    0(sp)           \n");   // push USP
+-}
+-if(interrupt) {
+-  if(multitask) {
+-    ASM("       csrr     x3,    sepc            \n"
+-        "       sd       x3,    0(sp)           \n");   // push SEPC as PC on interrupts
+-  } else {
+-    ASM("       csrr     x3,    mepc            \n"
+-        "       sd       x3,    0(sp)           \n");   // push MEPC as PC on interrupts
+-  }
+-} else {
+-    ASM("       sd       x1,    0(sp)           \n");   // push RA as PC on context switches
++if(interrupt && multitask) {
++    // swap(ksp, usp)
++    ASM("       csrr    x3, sstatus             \n"
++        "       andi    x3, x3, 1 << 8          \n"
++        "       bne     x3, zero, 1f            \n"
++        "       csrr    x3, sscratch            \n"
++        "       csrw    sscratch, sp            \n"
++        "       mv      sp, x3                  \n"
++        "1:                                     \n");
+ }
+-if(!interrupt && multitask) {
+-    ASM("       li       x3,      %0            \n"
+-        "       csrs     sstatus, x3            \n": : "i"(SPP_S));   // set SPP_S inside the kernel; the push(true) on IC::entry() has already saved the correct value to eventually return to the application
++    ASM("       addi    sp, sp, %0              \n" : : "i"(-sizeof(Context))); // adjust sp for the pushes below
++
++if(multitask)
++    ASM("       csrr    x3, sscratch            \n"     // sscratch = usp (sscratch holds ksp in user-land and usp in kernel; usp = 0 for kernel threads)
++        "       sd      x3,     0(sp)           \n");   // push usp
++
++if(interrupt)
++  if(multitask)
++    ASM("       csrr    x3, sepc                \n"
++        "       sd      x3,     8(sp)           \n");   // push sepc as pc on interrupts
++  else
++    ASM("       csrr    x3, mepc                \n"
++        "       sd      x3,     8(sp)           \n");   // push mecp as pc on interrupts
++else
++    ASM("       sd      x1,     8(sp)           \n");   // push lr as pc on context switches
++
++if(!interrupt && multitask)
++    ASM("       li      x3, 1 << 8              \n"
++        "       csrs    sstatus, x3             \n");   // set SPP_S inside the kernel; the push(true) on IC::entry() has already saved the correct value to eventually return to the application
++if(multitask)
++    ASM("       csrr    x3, sstatus             \n");
++else {
++    ASM("       csrr    x3, mstatus             \n");
+ }
+-if(multitask) {
+-    ASM("       csrr     x3, sstatus            \n");
+-} else {
+-    ASM("       csrr     x3, mstatus            \n");
+-}
+-    ASM("       sd       x3,    8(sp)           \n"     // push ST
+-        "       sd       x1,   16(sp)           \n"     // push RA
+-        "       sd       x5,   24(sp)           \n"     // push x5-x31
+-        "       sd       x6,   32(sp)           \n"
+-        "       sd       x7,   40(sp)           \n"
+-        "       sd       x8,   48(sp)           \n"
+-        "       sd       x9,   56(sp)           \n"
+-        "       sd      x10,   64(sp)           \n"
+-        "       sd      x11,   72(sp)           \n"
+-        "       sd      x12,   80(sp)           \n"
+-        "       sd      x13,   88(sp)           \n"
+-        "       sd      x14,   96(sp)           \n"
+-        "       sd      x15,  104(sp)           \n"
+-        "       sd      x16,  112(sp)           \n"
+-        "       sd      x17,  120(sp)           \n"
+-        "       sd      x18,  128(sp)           \n"
+-        "       sd      x19,  136(sp)           \n"
+-        "       sd      x20,  144(sp)           \n"
+-        "       sd      x21,  152(sp)           \n"
+-        "       sd      x22,  160(sp)           \n"
+-        "       sd      x23,  168(sp)           \n"
+-        "       sd      x24,  176(sp)           \n"
+-        "       sd      x25,  184(sp)           \n"
+-        "       sd      x26,  192(sp)           \n"
+-        "       sd      x27,  200(sp)           \n"
+-        "       sd      x28,  208(sp)           \n"
+-        "       sd      x29,  216(sp)           \n"
+-        "       sd      x30,  224(sp)           \n"
+-        "       sd      x31,  232(sp)           \n");
++    ASM("       sd      x3,    16(sp)           \n"     // push st
++        "       sd      x1,    24(sp)           \n"     // push ra
++        "       sd      x5,    32(sp)           \n"     // push x5-x31
++        "       sd      x6,    40(sp)           \n"
++        "       sd      x7,    48(sp)           \n"
++        "       sd      x8,    56(sp)           \n"
++        "       sd      x9,    64(sp)           \n"
++        "       sd      x10,   72(sp)           \n"
++        "       sd      x11,   80(sp)           \n"
++        "       sd      x12,   88(sp)           \n"
++        "       sd      x13,   96(sp)           \n"
++        "       sd      x14,  104(sp)           \n"
++        "       sd      x15,  112(sp)           \n"
++        "       sd      x16,  120(sp)           \n"
++        "       sd      x17,  128(sp)           \n"
++        "       sd      x18,  136(sp)           \n"
++        "       sd      x19,  144(sp)           \n"
++        "       sd      x20,  152(sp)           \n"
++        "       sd      x21,  160(sp)           \n"
++        "       sd      x22,  168(sp)           \n"
++        "       sd      x23,  176(sp)           \n"
++        "       sd      x24,  184(sp)           \n"
++        "       sd      x25,  192(sp)           \n"
++        "       sd      x26,  200(sp)           \n"
++        "       sd      x27,  208(sp)           \n"
++        "       sd      x28,  216(sp)           \n"
++        "       sd      x29,  224(sp)           \n"
++        "       sd      x30,  232(sp)           \n"
++        "       sd      x31,  240(sp)           \n");
+ }
+ 
+ inline void CPU::Context::pop(bool interrupt)
+ {
+-    ASM("       ld       x3,    0(sp)           \n");   // pop PC into TMP
+-if(interrupt) {
+-    ASM("       add      x3, x3, a0             \n");   // A0 is set by exception handlers to adjust [M|S]EPC to point to the next instruction if needed
+-}
+ if(multitask) {
+-    ASM("       csrw     sepc, x3               \n");   // SEPC = PC
+-} else {
+-    ASM("       csrw     mepc, x3               \n");   // MEPC = PC
++    ASM("       ld       x3, 0(sp)              \n"     // pop usp
++        "       csrw     sscratch, x3           \n");   // sscratch = usp (sscratch holds ksp in user-land and usp in kernel; usp = 0 for kernel threads)
+ }
+-
+-    ASM("       ld       x3,    8(sp)           \n");   // pop ST into TMP
+-if(!interrupt & !multitask) {                           // [M|S]STATUS.[M|S]PP is automatically cleared on the [M|S]RET in the ISR, so we need to recover it here
+-    ASM("       li       a0,     %0             \n"     // use A0 as a second TMP (it will be restored later) to adjust [M|S]STATUS.[M|S]PP
+-        "       or       x3, x3, a0             \n" : : "i"(multitask ? SPP_S : MPP_M));
+-}
+-    ASM("       ld       x1,   16(sp)           \n"     // pop RA
+-        "       ld       x5,   24(sp)           \n"     // pop x5-x31
+-        "       ld       x6,   32(sp)           \n"
+-        "       ld       x7,   40(sp)           \n"
+-        "       ld       x8,   48(sp)           \n"
+-        "       ld       x9,   56(sp)           \n"
+-        "       ld      x10,   64(sp)           \n"
+-        "       ld      x11,   72(sp)           \n"
+-        "       ld      x12,   80(sp)           \n"
+-        "       ld      x13,   88(sp)           \n"
+-        "       ld      x14,   96(sp)           \n"
+-        "       ld      x15,  104(sp)           \n"
+-        "       ld      x16,  112(sp)           \n"
+-        "       ld      x17,  120(sp)           \n"
+-        "       ld      x18,  128(sp)           \n"
+-        "       ld      x19,  136(sp)           \n"
+-        "       ld      x20,  144(sp)           \n"
+-        "       ld      x21,  152(sp)           \n"
+-        "       ld      x22,  160(sp)           \n"
+-        "       ld      x23,  168(sp)           \n"
+-        "       ld      x24,  176(sp)           \n"
+-        "       ld      x25,  184(sp)           \n"
+-        "       ld      x26,  192(sp)           \n"
+-        "       ld      x27,  200(sp)           \n"
+-        "       ld      x28,  208(sp)           \n"
+-        "       ld      x29,  216(sp)           \n"
+-        "       ld      x30,  224(sp)           \n"
+-        "       ld      x31,  232(sp)           \n"
+-        "       addi    sp, sp, %0              \n" : : "i"(sizeof(Context))); // complete the pops above by adjusting SP
+-if(multitask) {
+-    ASM("       csrw    sstatus, x3             \n");   // SSTATUS = ST
+-} else {
+-    ASM("       csrw    mstatus, x3             \n");   // MSTATUS = ST
++    ASM("       ld       x3, 8(sp)              \n");   // pop pc
++if(interrupt)
++    ASM("       add      x3, x3, a0             \n");   // a0 is set by exception handlers to adjust [m|s]sepc to point to the next instruction if needed
++if(multitask)
++    ASM("       csrw     sepc, x3               \n");   // sepc = pc
++else {
++    ASM("       csrw     mepc, x3               \n");   // mepc = pc
+ }
++    ASM("       ld       x3,    16(sp)          \n"     // pop st to x3
++        "       ld       x1,   24(sp)           \n"     // pop ra
++        "       ld       x5,   32(sp)           \n"     // pop x5-x31
++        "       ld       x6,   40(sp)           \n"
++        "       ld       x7,   48(sp)           \n"
++        "       ld       x8,   56(sp)           \n"
++        "       ld       x9,   64(sp)           \n"
++        "       ld      x10,   72(sp)           \n"
++        "       ld      x11,   80(sp)           \n"
++        "       ld      x12,   88(sp)           \n"
++        "       ld      x13,   96(sp)           \n"
++        "       ld      x14,  104(sp)           \n"
++        "       ld      x15,  112(sp)           \n"
++        "       ld      x16,  120(sp)           \n"
++        "       ld      x17,  128(sp)           \n"
++        "       ld      x18,  136(sp)           \n"
++        "       ld      x19,  144(sp)           \n"
++        "       ld      x20,  152(sp)           \n"
++        "       ld      x21,  160(sp)           \n"
++        "       ld      x22,  168(sp)           \n"
++        "       ld      x23,  176(sp)           \n"
++        "       ld      x24,  184(sp)           \n"
++        "       ld      x25,  192(sp)           \n"
++        "       ld      x26,  200(sp)           \n"
++        "       ld      x27,  208(sp)           \n"
++        "       ld      x28,  216(sp)           \n"
++        "       ld      x29,  224(sp)           \n"
++        "       ld      x30,  232(sp)           \n"
++        "       ld      x31,  240(sp)           \n"
++        "       addi    sp, sp, %0              \n" : : "i"(sizeof(Context))); // complete the pops above by adjusting sp
++
++if(multitask)
++    ASM("       csrw    sstatus, x3             \n");   // sstatus = st
++else
++    ASM("       csrw    mstatus, x3             \n");   // mstatus = st
++if(!interrupt & !multitask)
++    ASM("       li      x3, 3 << 11             \n"
++        "       csrs    mstatus, x3             \n");   // mstatus.MPP is automatically cleared on mret, so we reset it to MPP_M here
++
++if(multitask && interrupt)
++    // swap(ksp, usp)
++    ASM("       andi    x3, x3, 1 << 8          \n"
++        "       bne     x3, zero, 1f            \n"
++        "       csrr    x3, sscratch            \n"
++        "       csrw    sscratch, sp            \n"
++        "       mv      sp, x3                  \n"
++        "1:                                     \n");
+ }
+ 
+ inline CPU::Reg64 htole64(CPU::Reg64 v) { return CPU::htole64(v); }
+diff --git a/include/process.h b/include/process.h
+index 96c66ab..116c45f 100644
+--- a/include/process.h
++++ b/include/process.h
+@@ -306,7 +306,41 @@ inline Thread::Thread(int (* entry)(Tn ...), Tn ... an)
+ 
+ template<typename ... Tn>
+ inline Thread::Thread(const Configuration & conf, int (* entry)(Tn ...), Tn ... an)
+-: _task(conf.task ? conf.task : Task::self()), _state(conf.state), _waiting(0), _joining(0), _link(this, conf.criterion);
++: _task(conf.task ? conf.task : Task::self()), _state(conf.state), _waiting(0), _joining(0), _link(this, conf.criterion) {
++    if(multitask && !conf.stack_size) { // auto-expand, user-level stack
++        constructor_prologue(STACK_SIZE);
++        _user_stack = new (SYSTEM) Segment(USER_STACK_SIZE);
++
++        // Attach the thread's user-level stack to the current address space so we can initialize it
++        Log_Addr ustack = Task::self()->address_space()->attach(_user_stack);
++
++        // Initialize the thread's user-level stack and determine a relative stack pointer (usp) from the top of the stack
++        Log_Addr usp = ustack + USER_STACK_SIZE;
++        if(conf.criterion == MAIN)
++            usp -= CPU::init_user_stack(usp, 0, an ...); // the main thread of each task must return to crt0 to call _fini (global destructors) before calling __exit
++        else
++            usp -= CPU::init_user_stack(usp, &__exit, an ...); // __exit will cause a Page Fault that must be properly handled
++
++        // Attach the thread's user-level stack from the current address space
++        Task::self()->address_space()->detach(_user_stack, ustack);
++
++        // Attach the thread's user-level stack to its task's address space so it will be able to access it when it runs
++        ustack = _task->address_space()->attach(_user_stack);
++
++        // Determine an absolute stack pointer (usp) from the top of the thread's user-level stack considering the address it will see it when it runs
++        usp = ustack + USER_STACK_SIZE - usp;
++
++        // Initialize the thread's system-level stack
++        _context = CPU::init_stack(usp, _stack + STACK_SIZE, &__exit, entry, an ...);
++    } else { // single-task scenarios and idle thread, which is a kernel thread, don't have a user-level stack
++        constructor_prologue(conf.stack_size);
++        _user_stack = 0;
++        _context = CPU::init_stack(0, _stack + conf.stack_size, &__exit, entry, an ...);
++    }
++
++    constructor_epilogue(entry, STACK_SIZE);
++
++};
+ 
+ __END_SYS
+ 
+diff --git a/include/scheduler.h b/include/scheduler.h
+index c59053c..6e2374d 100644
+--- a/include/scheduler.h
++++ b/include/scheduler.h
+@@ -145,6 +145,28 @@ public:
+     FCFS(int p = NORMAL, Tn & ... an);
+ };
+ 
++// Custom scheduling policy
++class mySched: public Priority
++{
++public:
++    static const bool timed = false;
++    static const bool dynamic = true;
++    static const bool preemptive = true;
++
++public:
++    template <typename ... Tn>
++    mySched(int p = NORMAL, Tn & ... an): Priority(p) {}
++
++    operator const volatile int() const volatile {
++        //Prioritize threads with even IDs over odd IDs
++        if (_priority % 2 == 0) {
++            return _priority + 1;
++        } else {
++            return _priority;
++        }
++    }
++};
++
+ __END_SYS
+ 
+ #endif
+diff --git a/include/system/traits.h b/include/system/traits.h
+index a430f7a..b3d7f65 100644
+--- a/include/system/traits.h
++++ b/include/system/traits.h
+@@ -102,6 +102,7 @@ class Task;
+ class Priority;
+ class FCFS;
+ class RR;
++class mySched;
+ class RM;
+ class DM;
+ class EDF;
+diff --git a/makefile b/makefile
+index f6e9e10..1ac93a0 100644
+--- a/makefile
++++ b/makefile
+@@ -25,6 +25,7 @@ endif
+ 
+ run1: etc img/$(APPLICATION)$(MACH_IMGSUFF)
+ 		(cd img && $(MAKE) run1)
++		lsof -t -i :1235 | xargs kill -9
+ 		
+ img/$(APPLICATION)$(MACH_IMGSUFF):
+ 		$(MAKE) $(PRECLEAN) all1
+@@ -38,6 +39,7 @@ endif
+ 
+ debug1: etc img/$(APPLICATION)$(MACH_IMGSUFF)
+ 		(cd img && $(MAKE) DEBUG=1 debug)
++		lsof -t -i :1235 | xargs kill -9
+ 
+ flash: FORCE
+ ifndef APPLICATION
+diff --git a/obj_hello.txt b/obj_hello.txt
+new file mode 100644
+index 0000000..a08ef79
+--- /dev/null
++++ b/obj_hello.txt
+@@ -0,0 +1,460 @@
++
++img/hello:     file format elf64-littleriscv
++
++
++Disassembly of section .init:
++
++ffffffc000000000 <.init>:
++ffffffc000000000:	00002797          	auipc	a5,0x2
++ffffffc000000004:	fe07b783          	ld	a5,-32(a5) # 0xffffffc000001fe0
++ffffffc000000008:	577d                	li	a4,-1
++ffffffc00000000a:	02e78863          	beq	a5,a4,0xffffffc00000003a
++ffffffc00000000e:	1101                	addi	sp,sp,-32
++ffffffc000000010:	ec06                	sd	ra,24(sp)
++ffffffc000000012:	e822                	sd	s0,16(sp)
++ffffffc000000014:	e426                	sd	s1,8(sp)
++ffffffc000000016:	00002417          	auipc	s0,0x2
++ffffffc00000001a:	fca40413          	addi	s0,s0,-54 # 0xffffffc000001fe0
++ffffffc00000001e:	54fd                	li	s1,-1
++ffffffc000000020:	a031                	j	0xffffffc00000002c
++ffffffc000000022:	9782                	jalr	a5
++ffffffc000000024:	1461                	addi	s0,s0,-8
++ffffffc000000026:	601c                	ld	a5,0(s0)
++ffffffc000000028:	00978463          	beq	a5,s1,0xffffffc000000030
++ffffffc00000002c:	f87d                	bnez	s0,0xffffffc000000022
++ffffffc00000002e:	bfdd                	j	0xffffffc000000024
++ffffffc000000030:	60e2                	ld	ra,24(sp)
++ffffffc000000032:	6442                	ld	s0,16(sp)
++ffffffc000000034:	64a2                	ld	s1,8(sp)
++ffffffc000000036:	6105                	addi	sp,sp,32
++ffffffc000000038:	8082                	ret
++ffffffc00000003a:	8082                	ret
++
++Disassembly of section .text:
++
++ffffffc000000100 <.text>:
++ffffffc000000100:	00000097          	auipc	ra,0x0
++ffffffc000000104:	f00080e7          	jalr	-256(ra) # 0xffffffc000000000
++ffffffc000000108:	00000013          	nop
++ffffffc00000010c:	00000013          	nop
++ffffffc000000110:	00000013          	nop
++ffffffc000000114:	00000013          	nop
++ffffffc000000118:	00000013          	nop
++ffffffc00000011c:	00000013          	nop
++ffffffc000000120:	00000013          	nop
++ffffffc000000124:	00000013          	nop
++ffffffc000000128:	00000013          	nop
++ffffffc00000012c:	00000013          	nop
++ffffffc000000130:	00000013          	nop
++ffffffc000000134:	00000013          	nop
++ffffffc000000138:	00000013          	nop
++ffffffc00000013c:	00000013          	nop
++ffffffc000000140:	00000013          	nop
++ffffffc000000144:	00000013          	nop
++ffffffc000000148:	00000013          	nop
++ffffffc00000014c:	00000013          	nop
++ffffffc000000150:	00000013          	nop
++ffffffc000000154:	00000013          	nop
++ffffffc000000158:	00000013          	nop
++ffffffc00000015c:	00000013          	nop
++ffffffc000000160:	00000013          	nop
++ffffffc000000164:	00000013          	nop
++ffffffc000000168:	00000013          	nop
++ffffffc00000016c:	00000013          	nop
++ffffffc000000170:	00000013          	nop
++ffffffc000000174:	00000013          	nop
++ffffffc000000178:	00000013          	nop
++ffffffc00000017c:	00000013          	nop
++ffffffc000000180:	00000013          	nop
++ffffffc000000184:	00000013          	nop
++ffffffc000000188:	00000013          	nop
++ffffffc00000018c:	00000013          	nop
++ffffffc000000190:	00000013          	nop
++ffffffc000000194:	00000013          	nop
++ffffffc000000198:	00000013          	nop
++ffffffc00000019c:	00000013          	nop
++ffffffc0000001a0:	00000013          	nop
++ffffffc0000001a4:	00000013          	nop
++ffffffc0000001a8:	00000013          	nop
++ffffffc0000001ac:	00000013          	nop
++ffffffc0000001b0:	00000013          	nop
++ffffffc0000001b4:	00000013          	nop
++ffffffc0000001b8:	00000013          	nop
++ffffffc0000001bc:	00000013          	nop
++ffffffc0000001c0:	00000013          	nop
++ffffffc0000001c4:	00000013          	nop
++ffffffc0000001c8:	00000013          	nop
++ffffffc0000001cc:	00000013          	nop
++ffffffc0000001d0:	00000013          	nop
++ffffffc0000001d4:	00000013          	nop
++ffffffc0000001d8:	00000013          	nop
++ffffffc0000001dc:	00000013          	nop
++ffffffc0000001e0:	00000013          	nop
++ffffffc0000001e4:	00000013          	nop
++ffffffc0000001e8:	00000013          	nop
++ffffffc0000001ec:	00000013          	nop
++ffffffc0000001f0:	00000013          	nop
++ffffffc0000001f4:	00000013          	nop
++ffffffc0000001f8:	00000013          	nop
++ffffffc0000001fc:	00000013          	nop
++ffffffc000000200:	00000097          	auipc	ra,0x0
++ffffffc000000204:	0fc080e7          	jalr	252(ra) # 0xffffffc0000002fc
++ffffffc000000208:	1161                	addi	sp,sp,-8
++ffffffc00000020a:	e02a                	sd	a0,0(sp)
++ffffffc00000020c:	00000097          	auipc	ra,0x0
++ffffffc000000210:	4e0080e7          	jalr	1248(ra) # 0xffffffc0000006ec
++ffffffc000000214:	6502                	ld	a0,0(sp)
++ffffffc000000216:	00000097          	auipc	ra,0x0
++ffffffc00000021a:	1da080e7          	jalr	474(ra) # 0xffffffc0000003f0
++	...
++ffffffc0000002fa:	0000                	unimp
++ffffffc0000002fc:	1141                	addi	sp,sp,-16
++ffffffc0000002fe:	e406                	sd	ra,8(sp)
++ffffffc000000300:	00000517          	auipc	a0,0x0
++ffffffc000000304:	43050513          	addi	a0,a0,1072 # 0xffffffc000000730
++ffffffc000000308:	00000097          	auipc	ra,0x0
++ffffffc00000030c:	06c080e7          	jalr	108(ra) # 0xffffffc000000374
++ffffffc000000310:	00002517          	auipc	a0,0x2
++ffffffc000000314:	cfc54503          	lbu	a0,-772(a0) # 0xffffffc00000200c
++ffffffc000000318:	00000097          	auipc	ra,0x0
++ffffffc00000031c:	0f0080e7          	jalr	240(ra) # 0xffffffc000000408
++ffffffc000000320:	00000517          	auipc	a0,0x0
++ffffffc000000324:	42050513          	addi	a0,a0,1056 # 0xffffffc000000740
++ffffffc000000328:	00000097          	auipc	ra,0x0
++ffffffc00000032c:	04c080e7          	jalr	76(ra) # 0xffffffc000000374
++ffffffc000000330:	47a9                	li	a5,10
++ffffffc000000332:	00002717          	auipc	a4,0x2
++ffffffc000000336:	ccf72b23          	sw	a5,-810(a4) # 0xffffffc000002008
++ffffffc00000033a:	4501                	li	a0,0
++ffffffc00000033c:	60a2                	ld	ra,8(sp)
++ffffffc00000033e:	0141                	addi	sp,sp,16
++ffffffc000000340:	8082                	ret
++ffffffc000000342:	00002797          	auipc	a5,0x2
++ffffffc000000346:	cc678793          	addi	a5,a5,-826 # 0xffffffc000002008
++ffffffc00000034a:	4729                	li	a4,10
++ffffffc00000034c:	c398                	sw	a4,0(a5)
++ffffffc00000034e:	00078223          	sb	zero,4(a5)
++ffffffc000000352:	8082                	ret
++ffffffc000000354:	00002797          	auipc	a5,0x2
++ffffffc000000358:	ccc78793          	addi	a5,a5,-820 # 0xffffffc000002020
++ffffffc00000035c:	4729                	li	a4,10
++ffffffc00000035e:	c398                	sw	a4,0(a5)
++ffffffc000000360:	00078223          	sb	zero,4(a5)
++ffffffc000000364:	00002797          	auipc	a5,0x2
++ffffffc000000368:	cb478793          	addi	a5,a5,-844 # 0xffffffc000002018
++ffffffc00000036c:	c398                	sw	a4,0(a5)
++ffffffc00000036e:	00078223          	sb	zero,4(a5)
++ffffffc000000372:	8082                	ret
++ffffffc000000374:	714d                	addi	sp,sp,-336
++ffffffc000000376:	e686                	sd	ra,328(sp)
++ffffffc000000378:	47ad                	li	a5,11
++ffffffc00000037a:	e43e                	sd	a5,8(sp)
++ffffffc00000037c:	e802                	sd	zero,16(sp)
++ffffffc00000037e:	47c1                	li	a5,16
++ffffffc000000380:	ec3e                	sd	a5,24(sp)
++ffffffc000000382:	003c                	addi	a5,sp,8
++ffffffc000000384:	fa3e                	sd	a5,304(sp)
++ffffffc000000386:	fe02                	sd	zero,312(sp)
++ffffffc000000388:	f02a                	sd	a0,32(sp)
++ffffffc00000038a:	853e                	mv	a0,a5
++ffffffc00000038c:	00000097          	auipc	ra,0x0
++ffffffc000000390:	358080e7          	jalr	856(ra) # 0xffffffc0000006e4
++ffffffc000000394:	60b6                	ld	ra,328(sp)
++ffffffc000000396:	6171                	addi	sp,sp,336
++ffffffc000000398:	8082                	ret
++ffffffc00000039a:	8082                	ret
++ffffffc00000039c:	714d                	addi	sp,sp,-336
++ffffffc00000039e:	e686                	sd	ra,328(sp)
++ffffffc0000003a0:	e2a2                	sd	s0,320(sp)
++ffffffc0000003a2:	842a                	mv	s0,a0
++ffffffc0000003a4:	e402                	sd	zero,8(sp)
++ffffffc0000003a6:	e802                	sd	zero,16(sp)
++ffffffc0000003a8:	0028                	addi	a0,sp,8
++ffffffc0000003aa:	fa2a                	sd	a0,304(sp)
++ffffffc0000003ac:	fe02                	sd	zero,312(sp)
++ffffffc0000003ae:	601c                	ld	a5,0(s0)
++ffffffc0000003b0:	ec3e                	sd	a5,24(sp)
++ffffffc0000003b2:	0005c603          	lbu	a2,0(a1)
++ffffffc0000003b6:	0015c683          	lbu	a3,1(a1)
++ffffffc0000003ba:	0025c703          	lbu	a4,2(a1)
++ffffffc0000003be:	0035c783          	lbu	a5,3(a1)
++ffffffc0000003c2:	02c10023          	sb	a2,32(sp)
++ffffffc0000003c6:	02d100a3          	sb	a3,33(sp)
++ffffffc0000003ca:	02e10123          	sb	a4,34(sp)
++ffffffc0000003ce:	02f101a3          	sb	a5,35(sp)
++ffffffc0000003d2:	00000097          	auipc	ra,0x0
++ffffffc0000003d6:	312080e7          	jalr	786(ra) # 0xffffffc0000006e4
++ffffffc0000003da:	6018                	ld	a4,0(s0)
++ffffffc0000003dc:	47ad                	li	a5,11
++ffffffc0000003de:	00f70763          	beq	a4,a5,0xffffffc0000003ec
++ffffffc0000003e2:	6562                	ld	a0,24(sp)
++ffffffc0000003e4:	60b6                	ld	ra,328(sp)
++ffffffc0000003e6:	6416                	ld	s0,320(sp)
++ffffffc0000003e8:	6171                	addi	sp,sp,336
++ffffffc0000003ea:	8082                	ret
++ffffffc0000003ec:	6542                	ld	a0,16(sp)
++ffffffc0000003ee:	bfdd                	j	0xffffffc0000003e4
++ffffffc0000003f0:	1101                	addi	sp,sp,-32
++ffffffc0000003f2:	ec06                	sd	ra,24(sp)
++ffffffc0000003f4:	c22a                	sw	a0,4(sp)
++ffffffc0000003f6:	47dd                	li	a5,23
++ffffffc0000003f8:	e43e                	sd	a5,8(sp)
++ffffffc0000003fa:	004c                	addi	a1,sp,4
++ffffffc0000003fc:	0028                	addi	a0,sp,8
++ffffffc0000003fe:	00000097          	auipc	ra,0x0
++ffffffc000000402:	f9e080e7          	jalr	-98(ra) # 0xffffffc00000039c
++ffffffc000000406:	a001                	j	0xffffffc000000406
++ffffffc000000408:	e111                	bnez	a0,0xffffffc00000040c
++ffffffc00000040a:	8082                	ret
++ffffffc00000040c:	1141                	addi	sp,sp,-16
++ffffffc00000040e:	e406                	sd	ra,8(sp)
++ffffffc000000410:	557d                	li	a0,-1
++ffffffc000000412:	00000097          	auipc	ra,0x0
++ffffffc000000416:	fde080e7          	jalr	-34(ra) # 0xffffffc0000003f0
++ffffffc00000041a:	00002797          	auipc	a5,0x2
++ffffffc00000041e:	c3e78793          	addi	a5,a5,-962 # 0xffffffc000002058
++ffffffc000000422:	0007a023          	sw	zero,0(a5)
++ffffffc000000426:	0007b423          	sd	zero,8(a5)
++ffffffc00000042a:	0007b823          	sd	zero,16(a5)
++ffffffc00000042e:	0007bc23          	sd	zero,24(a5)
++ffffffc000000432:	0207b023          	sd	zero,32(a5)
++ffffffc000000436:	0207b423          	sd	zero,40(a5)
++ffffffc00000043a:	0207b823          	sd	zero,48(a5)
++ffffffc00000043e:	0207bc23          	sd	zero,56(a5)
++ffffffc000000442:	0407b023          	sd	zero,64(a5)
++ffffffc000000446:	00002797          	auipc	a5,0x2
++ffffffc00000044a:	be278793          	addi	a5,a5,-1054 # 0xffffffc000002028
++ffffffc00000044e:	4729                	li	a4,10
++ffffffc000000450:	c398                	sw	a4,0(a5)
++ffffffc000000452:	00078223          	sb	zero,4(a5)
++ffffffc000000456:	8082                	ret
++ffffffc000000458:	6d1c                	ld	a5,24(a0)
++ffffffc00000045a:	6598                	ld	a4,8(a1)
++ffffffc00000045c:	97ba                	add	a5,a5,a4
++ffffffc00000045e:	ed1c                	sd	a5,24(a0)
++ffffffc000000460:	0006b023          	sd	zero,0(a3)
++ffffffc000000464:	00063023          	sd	zero,0(a2)
++ffffffc000000468:	0005b303          	ld	t1,0(a1)
++ffffffc00000046c:	0085b883          	ld	a7,8(a1)
++ffffffc000000470:	989a                	add	a7,a7,t1
++ffffffc000000472:	651c                	ld	a5,8(a0)
++ffffffc000000474:	c3d5                	beqz	a5,0xffffffc000000518
++ffffffc000000476:	873e                	mv	a4,a5
++ffffffc000000478:	00073803          	ld	a6,0(a4)
++ffffffc00000047c:	01088463          	beq	a7,a6,0xffffffc000000484
++ffffffc000000480:	6f18                	ld	a4,24(a4)
++ffffffc000000482:	fb7d                	bnez	a4,0xffffffc000000478
++ffffffc000000484:	0007b803          	ld	a6,0(a5)
++ffffffc000000488:	0087b883          	ld	a7,8(a5)
++ffffffc00000048c:	9846                	add	a6,a6,a7
++ffffffc00000048e:	09030763          	beq	t1,a6,0xffffffc00000051c
++ffffffc000000492:	6f9c                	ld	a5,24(a5)
++ffffffc000000494:	fbe5                	bnez	a5,0xffffffc000000484
++ffffffc000000496:	01053803          	ld	a6,16(a0)
++ffffffc00000049a:	611c                	ld	a5,0(a0)
++ffffffc00000049c:	cb99                	beqz	a5,0xffffffc0000004b2
++ffffffc00000049e:	00b83c23          	sd	a1,24(a6)
++ffffffc0000004a2:	691c                	ld	a5,16(a0)
++ffffffc0000004a4:	e99c                	sd	a5,16(a1)
++ffffffc0000004a6:	0005bc23          	sd	zero,24(a1)
++ffffffc0000004aa:	e90c                	sd	a1,16(a0)
++ffffffc0000004ac:	611c                	ld	a5,0(a0)
++ffffffc0000004ae:	0785                	addi	a5,a5,1
++ffffffc0000004b0:	a809                	j	0xffffffc0000004c2
++ffffffc0000004b2:	0005b823          	sd	zero,16(a1)
++ffffffc0000004b6:	0005bc23          	sd	zero,24(a1)
++ffffffc0000004ba:	e50c                	sd	a1,8(a0)
++ffffffc0000004bc:	e90c                	sd	a1,16(a0)
++ffffffc0000004be:	611c                	ld	a5,0(a0)
++ffffffc0000004c0:	0785                	addi	a5,a5,1
++ffffffc0000004c2:	e11c                	sd	a5,0(a0)
++ffffffc0000004c4:	4781                	li	a5,0
++ffffffc0000004c6:	ef21                	bnez	a4,0xffffffc00000051e
++ffffffc0000004c8:	8082                	ret
++ffffffc0000004ca:	00053423          	sd	zero,8(a0)
++ffffffc0000004ce:	00053823          	sd	zero,16(a0)
++ffffffc0000004d2:	00053023          	sd	zero,0(a0)
++ffffffc0000004d6:	a059                	j	0xffffffc00000055c
++ffffffc0000004d8:	08080263          	beqz	a6,0xffffffc00000055c
++ffffffc0000004dc:	00853803          	ld	a6,8(a0)
++ffffffc0000004e0:	01883803          	ld	a6,24(a6)
++ffffffc0000004e4:	01053423          	sd	a6,8(a0)
++ffffffc0000004e8:	00083823          	sd	zero,16(a6)
++ffffffc0000004ec:	00053803          	ld	a6,0(a0)
++ffffffc0000004f0:	187d                	addi	a6,a6,-1
++ffffffc0000004f2:	01053023          	sd	a6,0(a0)
++ffffffc0000004f6:	a09d                	j	0xffffffc00000055c
++ffffffc0000004f8:	06080263          	beqz	a6,0xffffffc00000055c
++ffffffc0000004fc:	01053803          	ld	a6,16(a0)
++ffffffc000000500:	01083803          	ld	a6,16(a6)
++ffffffc000000504:	01053823          	sd	a6,16(a0)
++ffffffc000000508:	00083c23          	sd	zero,24(a6)
++ffffffc00000050c:	00053803          	ld	a6,0(a0)
++ffffffc000000510:	187d                	addi	a6,a6,-1
++ffffffc000000512:	01053023          	sd	a6,0(a0)
++ffffffc000000516:	a099                	j	0xffffffc00000055c
++ffffffc000000518:	873e                	mv	a4,a5
++ffffffc00000051a:	bfb5                	j	0xffffffc000000496
++ffffffc00000051c:	c331                	beqz	a4,0xffffffc000000560
++ffffffc00000051e:	0085b803          	ld	a6,8(a1)
++ffffffc000000522:	00873883          	ld	a7,8(a4)
++ffffffc000000526:	9846                	add	a6,a6,a7
++ffffffc000000528:	0105b423          	sd	a6,8(a1)
++ffffffc00000052c:	00053803          	ld	a6,0(a0)
++ffffffc000000530:	4885                	li	a7,1
++ffffffc000000532:	f9180ce3          	beq	a6,a7,0xffffffc0000004ca
++ffffffc000000536:	01073303          	ld	t1,16(a4)
++ffffffc00000053a:	f8030fe3          	beqz	t1,0xffffffc0000004d8
++ffffffc00000053e:	01873883          	ld	a7,24(a4)
++ffffffc000000542:	fa088be3          	beqz	a7,0xffffffc0000004f8
++ffffffc000000546:	01133c23          	sd	a7,24(t1)
++ffffffc00000054a:	01073803          	ld	a6,16(a4)
++ffffffc00000054e:	0108b823          	sd	a6,16(a7)
++ffffffc000000552:	00053803          	ld	a6,0(a0)
++ffffffc000000556:	187d                	addi	a6,a6,-1
++ffffffc000000558:	01053023          	sd	a6,0(a0)
++ffffffc00000055c:	e218                	sd	a4,0(a2)
++ffffffc00000055e:	c799                	beqz	a5,0xffffffc00000056c
++ffffffc000000560:	6798                	ld	a4,8(a5)
++ffffffc000000562:	6590                	ld	a2,8(a1)
++ffffffc000000564:	9732                	add	a4,a4,a2
++ffffffc000000566:	e798                	sd	a4,8(a5)
++ffffffc000000568:	e28c                	sd	a1,0(a3)
++ffffffc00000056a:	8082                	ret
++ffffffc00000056c:	8082                	ret
++ffffffc00000056e:	1101                	addi	sp,sp,-32
++ffffffc000000570:	ec06                	sd	ra,24(sp)
++ffffffc000000572:	e822                	sd	s0,16(sp)
++ffffffc000000574:	00002417          	auipc	s0,0x2
++ffffffc000000578:	ab440413          	addi	s0,s0,-1356 # 0xffffffc000002028
++ffffffc00000057c:	00040223          	sb	zero,4(s0)
++ffffffc000000580:	00000097          	auipc	ra,0x0
++ffffffc000000584:	e1a080e7          	jalr	-486(ra) # 0xffffffc00000039a
++ffffffc000000588:	00000517          	auipc	a0,0x0
++ffffffc00000058c:	1c050513          	addi	a0,a0,448 # 0xffffffc000000748
++ffffffc000000590:	00000097          	auipc	ra,0x0
++ffffffc000000594:	de4080e7          	jalr	-540(ra) # 0xffffffc000000374
++ffffffc000000598:	00444503          	lbu	a0,4(s0)
++ffffffc00000059c:	00000097          	auipc	ra,0x0
++ffffffc0000005a0:	e6c080e7          	jalr	-404(ra) # 0xffffffc000000408
++ffffffc0000005a4:	00000517          	auipc	a0,0x0
++ffffffc0000005a8:	19c50513          	addi	a0,a0,412 # 0xffffffc000000740
++ffffffc0000005ac:	00000097          	auipc	ra,0x0
++ffffffc0000005b0:	dc8080e7          	jalr	-568(ra) # 0xffffffc000000374
++ffffffc0000005b4:	47a9                	li	a5,10
++ffffffc0000005b6:	c01c                	sw	a5,0(s0)
++ffffffc0000005b8:	00003597          	auipc	a1,0x3
++ffffffc0000005bc:	ae758593          	addi	a1,a1,-1305 # 0xffffffc00000309f
++ffffffc0000005c0:	77fd                	lui	a5,0xfffff
++ffffffc0000005c2:	8dfd                	and	a1,a1,a5
++ffffffc0000005c4:	f00017b7          	lui	a5,0xf0001
++ffffffc0000005c8:	07aa                	slli	a5,a5,0xa
++ffffffc0000005ca:	00f5f363          	bgeu	a1,a5,0xffffffc0000005d0
++ffffffc0000005ce:	85be                	mv	a1,a5
++ffffffc0000005d0:	00002417          	auipc	s0,0x2
++ffffffc0000005d4:	a6840413          	addi	s0,s0,-1432 # 0xffffffc000002038
++ffffffc0000005d8:	00040023          	sb	zero,0(s0)
++ffffffc0000005dc:	000400a3          	sb	zero,1(s0)
++ffffffc0000005e0:	00040123          	sb	zero,2(s0)
++ffffffc0000005e4:	000401a3          	sb	zero,3(s0)
++ffffffc0000005e8:	00040223          	sb	zero,4(s0)
++ffffffc0000005ec:	000402a3          	sb	zero,5(s0)
++ffffffc0000005f0:	00040323          	sb	zero,6(s0)
++ffffffc0000005f4:	000403a3          	sb	zero,7(s0)
++ffffffc0000005f8:	00040423          	sb	zero,8(s0)
++ffffffc0000005fc:	000404a3          	sb	zero,9(s0)
++ffffffc000000600:	00040523          	sb	zero,10(s0)
++ffffffc000000604:	000405a3          	sb	zero,11(s0)
++ffffffc000000608:	00040623          	sb	zero,12(s0)
++ffffffc00000060c:	000406a3          	sb	zero,13(s0)
++ffffffc000000610:	00040723          	sb	zero,14(s0)
++ffffffc000000614:	000407a3          	sb	zero,15(s0)
++ffffffc000000618:	00040823          	sb	zero,16(s0)
++ffffffc00000061c:	000408a3          	sb	zero,17(s0)
++ffffffc000000620:	00040923          	sb	zero,18(s0)
++ffffffc000000624:	000409a3          	sb	zero,19(s0)
++ffffffc000000628:	00040a23          	sb	zero,20(s0)
++ffffffc00000062c:	00040aa3          	sb	zero,21(s0)
++ffffffc000000630:	00040b23          	sb	zero,22(s0)
++ffffffc000000634:	00040ba3          	sb	zero,23(s0)
++ffffffc000000638:	00040c23          	sb	zero,24(s0)
++ffffffc00000063c:	00040ca3          	sb	zero,25(s0)
++ffffffc000000640:	00040d23          	sb	zero,26(s0)
++ffffffc000000644:	00040da3          	sb	zero,27(s0)
++ffffffc000000648:	00040e23          	sb	zero,28(s0)
++ffffffc00000064c:	00040ea3          	sb	zero,29(s0)
++ffffffc000000650:	00040f23          	sb	zero,30(s0)
++ffffffc000000654:	00040fa3          	sb	zero,31(s0)
++ffffffc000000658:	e18c                	sd	a1,0(a1)
++ffffffc00000065a:	004007b7          	lui	a5,0x400
++ffffffc00000065e:	e59c                	sd	a5,8(a1)
++ffffffc000000660:	0005b823          	sd	zero,16(a1)
++ffffffc000000664:	0005bc23          	sd	zero,24(a1)
++ffffffc000000668:	0034                	addi	a3,sp,8
++ffffffc00000066a:	860a                	mv	a2,sp
++ffffffc00000066c:	8522                	mv	a0,s0
++ffffffc00000066e:	00000097          	auipc	ra,0x0
++ffffffc000000672:	dea080e7          	jalr	-534(ra) # 0xffffffc000000458
++ffffffc000000676:	00002797          	auipc	a5,0x2
++ffffffc00000067a:	9887bd23          	sd	s0,-1638(a5) # 0xffffffc000002010
++ffffffc00000067e:	00002417          	auipc	s0,0x2
++ffffffc000000682:	9aa40413          	addi	s0,s0,-1622 # 0xffffffc000002028
++ffffffc000000686:	00040223          	sb	zero,4(s0)
++ffffffc00000068a:	00000097          	auipc	ra,0x0
++ffffffc00000068e:	d10080e7          	jalr	-752(ra) # 0xffffffc00000039a
++ffffffc000000692:	00000517          	auipc	a0,0x0
++ffffffc000000696:	0de50513          	addi	a0,a0,222 # 0xffffffc000000770
++ffffffc00000069a:	00000097          	auipc	ra,0x0
++ffffffc00000069e:	cda080e7          	jalr	-806(ra) # 0xffffffc000000374
++ffffffc0000006a2:	00444503          	lbu	a0,4(s0)
++ffffffc0000006a6:	00000097          	auipc	ra,0x0
++ffffffc0000006aa:	d62080e7          	jalr	-670(ra) # 0xffffffc000000408
++ffffffc0000006ae:	00000517          	auipc	a0,0x0
++ffffffc0000006b2:	09250513          	addi	a0,a0,146 # 0xffffffc000000740
++ffffffc0000006b6:	00000097          	auipc	ra,0x0
++ffffffc0000006ba:	cbe080e7          	jalr	-834(ra) # 0xffffffc000000374
++ffffffc0000006be:	47a9                	li	a5,10
++ffffffc0000006c0:	c01c                	sw	a5,0(s0)
++ffffffc0000006c2:	60e2                	ld	ra,24(sp)
++ffffffc0000006c4:	6442                	ld	s0,16(sp)
++ffffffc0000006c6:	6105                	addi	sp,sp,32
++ffffffc0000006c8:	8082                	ret
++ffffffc0000006ca:	1141                	addi	sp,sp,-16
++ffffffc0000006cc:	e406                	sd	ra,8(sp)
++ffffffc0000006ce:	00002517          	auipc	a0,0x2
++ffffffc0000006d2:	96250513          	addi	a0,a0,-1694 # 0xffffffc000002030
++ffffffc0000006d6:	00000097          	auipc	ra,0x0
++ffffffc0000006da:	e98080e7          	jalr	-360(ra) # 0xffffffc00000056e
++ffffffc0000006de:	60a2                	ld	ra,8(sp)
++ffffffc0000006e0:	0141                	addi	sp,sp,16
++ffffffc0000006e2:	8082                	ret
++ffffffc0000006e4:	85aa                	mv	a1,a0
++ffffffc0000006e6:	00000073          	ecall
++ffffffc0000006ea:	8082                	ret
++
++Disassembly of section .fini:
++
++ffffffc0000006ec <.fini>:
++ffffffc0000006ec:	00002797          	auipc	a5,0x2
++ffffffc0000006f0:	9147a783          	lw	a5,-1772(a5) # 0xffffffc000002000
++ffffffc0000006f4:	c391                	beqz	a5,0xffffffc0000006f8
++ffffffc0000006f6:	8082                	ret
++ffffffc0000006f8:	4785                	li	a5,1
++ffffffc0000006fa:	00002717          	auipc	a4,0x2
++ffffffc0000006fe:	90f72323          	sw	a5,-1786(a4) # 0xffffffc000002000
++ffffffc000000702:	00002797          	auipc	a5,0x2
++ffffffc000000706:	8f67b783          	ld	a5,-1802(a5) # 0xffffffc000001ff8
++ffffffc00000070a:	d7f5                	beqz	a5,0xffffffc0000006f6
++ffffffc00000070c:	1141                	addi	sp,sp,-16
++ffffffc00000070e:	e406                	sd	ra,8(sp)
++ffffffc000000710:	e022                	sd	s0,0(sp)
++ffffffc000000712:	00002417          	auipc	s0,0x2
++ffffffc000000716:	8e640413          	addi	s0,s0,-1818 # 0xffffffc000001ff8
++ffffffc00000071a:	9782                	jalr	a5
++ffffffc00000071c:	0421                	addi	s0,s0,8
++ffffffc00000071e:	601c                	ld	a5,0(s0)
++ffffffc000000720:	ffed                	bnez	a5,0xffffffc00000071a
++ffffffc000000722:	60a2                	ld	ra,8(sp)
++ffffffc000000724:	6402                	ld	s0,0(sp)
++ffffffc000000726:	0141                	addi	sp,sp,16
++ffffffc000000728:	8082                	ret
+diff --git a/src/api/thread_init.cc b/src/api/thread_init.cc
+index 323516e..3120093 100644
+--- a/src/api/thread_init.cc
++++ b/src/api/thread_init.cc
+@@ -27,7 +27,7 @@ void Thread::init()
+ 
+ #else
+ 
+-    typedef int (Main)(int argc, char * argv[]);
++    typedef int (Main)(int argc, char * argv[]); //
+ 
+     System_Info * si = System::info();
+ 
+@@ -37,8 +37,12 @@ void Thread::init()
+     Log_Addr code = si->lm.app_code;
+     Log_Addr data = si->lm.app_data;
+     Main * main = reinterpret_cast<Main *>(si->lm.app_entry);
++    int argc = static_cast<int>(si->lm.app_extra_size);
++    char ** argv = reinterpret_cast<char **>(si->lm.app_extra);
++    new (SYSTEM) Task(as, cs, ds, code, data, main, argc, argv);
+ 
+-    new (SYSTEM) Task(as, cs, ds, code, data, main);
++    //new (SYSTEM) Task(as, cs, ds, code, data, main);
++    
+ 
+ #endif
+ 
+diff --git a/src/architecture/rv64/rv64_cpu.cc b/src/architecture/rv64/rv64_cpu.cc
+index 97cd876..6ee0fdf 100644
+--- a/src/architecture/rv64/rv64_cpu.cc
++++ b/src/architecture/rv64/rv64_cpu.cc
+@@ -10,41 +10,43 @@ unsigned int CPU::_bus_clock;
+ 
+ void CPU::Context::save() volatile
+ {
+-    ASM("       sd       x1,    0(a0)           \n");   // push RA as PC
+-if(multitask) {
++    ASM("       csrr     x3,  sscratch          \n"     // sscratch = usp (sscratch holds ksp in user-land and usp in kernel; usp = 0 for kernel threads)
++        "       sd       x3,    0(a0)           \n"     // push usp
++        "       sd       x1,    8(a0)           \n");   // push lr as pc
++if(multitask)
+     ASM("       csrr     x3,  sstatus           \n");
+-} else {
++else {
+     ASM("       csrr     x3,  mstatus           \n");
+ }
+-    ASM("       sd       x3,    8(sp)           \n"     // push ST
+-        "       sd       x1,   16(sp)           \n"     // push RA
+-        "       sd       x5,   24(sp)           \n"     // push x5-x31
+-        "       sd       x6,   32(sp)           \n"
+-        "       sd       x7,   40(sp)           \n"
+-        "       sd       x8,   48(sp)           \n"
+-        "       sd       x9,   56(sp)           \n"
+-        "       sd      x10,   64(sp)           \n"
+-        "       sd      x11,   72(sp)           \n"
+-        "       sd      x12,   80(sp)           \n"
+-        "       sd      x13,   88(sp)           \n"
+-        "       sd      x14,   96(sp)           \n"
+-        "       sd      x15,  104(sp)           \n"
+-        "       sd      x16,  112(sp)           \n"
+-        "       sd      x17,  120(sp)           \n"
+-        "       sd      x18,  128(sp)           \n"
+-        "       sd      x19,  136(sp)           \n"
+-        "       sd      x20,  144(sp)           \n"
+-        "       sd      x21,  152(sp)           \n"
+-        "       sd      x22,  160(sp)           \n"
+-        "       sd      x23,  168(sp)           \n"
+-        "       sd      x24,  176(sp)           \n"
+-        "       sd      x25,  184(sp)           \n"
+-        "       sd      x26,  192(sp)           \n"
+-        "       sd      x27,  200(sp)           \n"
+-        "       sd      x28,  208(sp)           \n"
+-        "       sd      x29,  216(sp)           \n"
+-        "       sd      x30,  224(sp)           \n"
+-        "       sd      x31,  232(sp)           \n"
++    ASM("       sd       x3,   16(a0)           \n"     // push st
++        "       sd       x1,   24(a0)           \n"     // push ra
++        "       sd       x5,   32(a0)           \n"     // push x5-x31
++        "       sd       x6,   40(a0)           \n"
++        "       sd       x7,   48(a0)           \n"
++        "       sd       x8,   56(a0)           \n"
++        "       sd       x9,   64(a0)           \n"
++        "       sd      x10,   72(a0)           \n"
++        "       sd      x11,   80(a0)           \n"
++        "       sd      x12,   88(a0)           \n"
++        "       sd      x13,   96(a0)           \n"
++        "       sd      x14,  104(a0)           \n"
++        "       sd      x15,  112(a0)           \n"
++        "       sd      x16,  120(a0)           \n"
++        "       sd      x17,  128(a0)           \n"
++        "       sd      x18,  136(a0)           \n"
++        "       sd      x19,  144(a0)           \n"
++        "       sd      x20,  152(a0)           \n"
++        "       sd      x21,  160(a0)           \n"
++        "       sd      x22,  168(a0)           \n"
++        "       sd      x23,  176(a0)           \n"
++        "       sd      x24,  184(a0)           \n"
++        "       sd      x25,  192(a0)           \n"
++        "       sd      x26,  200(a0)           \n"
++        "       sd      x27,  208(a0)           \n"
++        "       sd      x28,  216(a0)           \n"
++        "       sd      x29,  224(a0)           \n"
++        "       sd      x30,  232(a0)           \n"
++        "       sd      x31,  240(a0)           \n"
+         "       ret                             \n");
+ }
+ 
+diff --git a/src/architecture/rv64/rv64_cpu_syscalled.cc b/src/architecture/rv64/rv64_cpu_syscalled.cc
+index ed9ca77..149be47 100644
+--- a/src/architecture/rv64/rv64_cpu_syscalled.cc
++++ b/src/architecture/rv64/rv64_cpu_syscalled.cc
+@@ -8,13 +8,19 @@ __BEGIN_SYS
+ 
+ #ifdef __kernel__
+ 
+-void CPU::syscalled(unsigned int int_id);
++void CPU::syscalled(unsigned int int_id) {
++    // We get here when an APP triggers INT_SYSCALL (i.e. ecall)
++    if(Traits<Build>::MODE == Traits<Build>::KERNEL) {
++        _exec(reinterpret_cast<void *>(CPU::a1())); // the message to EPOS Framework is passed on register a1
++        CPU::a0(4);                    // tell IC::entry to perform PC = PC + 4 on return
++    }
++};
+ 
+ #endif
+ 
+ #ifndef __library__
+ 
+-void CPU::Context::first_dispatch();
++void CPU::Context::first_dispatch() {};
+ 
+ #endif
+ 
+diff --git a/src/machine/riscv/riscv_ic.cc b/src/machine/riscv/riscv_ic.cc
+index 56f5632..49b8326 100644
+--- a/src/machine/riscv/riscv_ic.cc
++++ b/src/machine/riscv/riscv_ic.cc
+@@ -12,6 +12,9 @@ extern "C" { static void print_context(); }
+ 
+ __BEGIN_SYS
+ 
++static CPU::Reg a0;
++static CPU::Reg a1;
++
+ IC::Interrupt_Handler IC::_int_vector[IC::INTS];
+ 
+ void IC::entry()
+@@ -23,13 +26,12 @@ void IC::entry()
+ 
+     // Entry-point for the dummy contexts used by the first dispatching of newly created threads
+     ASM("       .global _int_leave              \n"
+-        "_int_leave:                            \n"
+-        "1:                                     \n");
++        "_int_leave:                            \n");
+ if(Traits<IC>::hysterically_debugged) {
+     ASM("       jalr    %0                      \n" : : "r"(print_context));
+ }
+-
+     // Restore context
++    ASM("1:                                     \n");
+     CPU::Context::pop(true);
+     CPU::iret();
+ }
+@@ -37,6 +39,8 @@ if(Traits<IC>::hysterically_debugged) {
+ void IC::dispatch()
+ {
+     Interrupt_Id id = int_id();
++    a0 = CPU::a0(); // exit passes status through a0
++    a1 = CPU::a1(); // syscalls pass messages through a1
+ 
+     if(((id != INT_SYS_TIMER) && (id != INT_SYSCALL) && ((id == CPU::EXC_IPF) && (CPU::epc() != CPU::Log_Addr(&__exit)))) || Traits<IC>::hysterically_debugged)
+         db<IC>(TRC) << "IC::dispatch(i=" << id << ") [sp=" << CPU::sp() << "]" << endl;
+@@ -49,11 +53,11 @@ void IC::dispatch()
+         if(id == INT_SYS_TIMER)
+             Timer::reset();
+     }
+-
++    CPU::a1(a1);
+     _int_vector[id](id);
+ 
+     if(id >= EXCS)
+-        CPU::fr(0); // tell CPU::Context::pop(true) not to increment PC since it is automatically incremented for hardware interrupts
++        CPU::a0(0); // tell CPU::Context::pop(true) not to increment PC since it is automatically incremented for hardware interrupts
+ }
+ 
+ void IC::int_not(Interrupt_Id id)
+@@ -129,7 +133,7 @@ void IC::exception(Interrupt_Id id)
+             db<IC, System>(ERR) << "Exception stopped execution due to hysterically debugging!" << endl;
+     }
+ 
+-    CPU::fr(4); // since exceptions do not increment PC, tell CPU::Context::pop(true) to perform PC = PC + 4 on return
++    CPU::a0(4); // since exceptions do not increment PC, tell CPU::Context::pop(true) to perform PC = PC + 4 on return
+ }
+ 
+ __END_SYS
+@@ -137,6 +141,6 @@ __END_SYS
+ static void print_context() {
+     __USING_SYS
+     db<IC, System>(TRC) << "IC::leave:ctx=" << /**static_cast<CPU::Context *>(CPU::sp() + 32) << */endl;
+-    CPU::fr(0);
++    CPU::a0(0);
+ }
+ 
+diff --git a/src/system/application_binding.cc b/src/system/application_binding.cc
+index b362f37..db9754b 100644
+--- a/src/system/application_binding.cc
++++ b/src/system/application_binding.cc
+@@ -27,7 +27,10 @@ extern "C" {
+ __USING_SYS;
+ extern "C" {
+     void _syscall(void * m) { CPU::syscall(m); }
+-    void _print(const char * s);
++    void _print(const char * s){
++        Message msg(Id(UTILITY_ID, 0), Message::PRINT, reinterpret_cast<unsigned long>(s));
++        msg.act();
++    }
+     void _print_preamble() {}
+     void _print_trailler(bool error) { if(error) _exit(-1); }
+ }
