@@ -47,7 +47,7 @@ public:
 
             APP  = (V | R | W | X | U | IAD),
             APPC = (V | R |     X | U | IAD),
-            APPD = (V | R | W | X | U | IAD),
+            APPD = (V | R | W | U | IAD),
             SYS  = (V | R | W | X | IAD),
             IO   = (SYS | MIO),
             DMA  = (SYS | CT),
@@ -266,7 +266,7 @@ public:
                 Attacher * at = pde2phy(_pd->log()[i]);
                 if(at)
                     for(unsigned int j = 0; j < AT_ENTRIES; j++)
-                        if(unflag(ate2phy(at->log()[j & (AT_ENTRIES - 1)])) == unflag(chunk.pt()))
+                        if(unflag(ate2phy(at->log()[j])) == unflag(chunk.pt()))
                             return (i << PD_SHIFT) + (j << AT_SHIFT);
             }
             return Log_Addr(false);

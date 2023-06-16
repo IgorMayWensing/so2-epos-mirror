@@ -149,6 +149,7 @@ public:
         unsigned int size() const { return _bytes; }
         Phy_Addr phy_address() const { return _phy_addr; } // always CT
         int resize(unsigned int amount) { return 0; } // no resize in CT
+        void reflag(Flags flags) { _flags = flags; }
 
     private:
         Phy_Addr _phy_addr;

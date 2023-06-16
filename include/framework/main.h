@@ -44,6 +44,7 @@ __BEGIN_API
 __USING_UTIL
 
 EXPORT(CPU);
+EXPORT(MMU);
 EXPORT(Handler);
 EXPORT(Function_Handler);
 

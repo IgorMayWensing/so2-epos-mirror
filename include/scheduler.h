@@ -145,6 +145,28 @@ public:
     FCFS(int p = NORMAL, Tn & ... an);
 };
 
+// Custom scheduling policy
+class mySched: public Priority
+{
+public:
+    static const bool timed = false;
+    static const bool dynamic = true;
+    static const bool preemptive = true;
+
+public:
+    template <typename ... Tn>
+    mySched(int p = NORMAL, Tn & ... an): Priority(p) {}
+
+    operator const volatile int() const volatile {
+        //Prioritize threads with even IDs over odd IDs
+        if (_priority % 2 == 0) {
+            return _priority + 1;
+        } else {
+            return _priority;
+        }
+    }
+};
+
 __END_SYS
 
 #endif

@@ -58,7 +58,7 @@ public:
 
     unsigned long size() const;
     Phy_Addr phy_address() const;
-    int resize(long amount);
+    long resize(long amount);
 
 private:
     Segment(Phy_Addr pt, unsigned int from, unsigned int to, Flags flags): Chunk(pt, from, to, flags) {

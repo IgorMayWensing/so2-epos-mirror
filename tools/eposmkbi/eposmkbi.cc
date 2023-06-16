@@ -182,7 +182,7 @@ int main(int argc, char **argv)
         si.bm.uuid[i]  = CONFIG.uuid[i];
 
     // Create the boot image
-    unsigned int image_size = 0;
+    unsigned long image_size = 0;
     fprintf(out, "\n  Creating EPOS bootable image in \"%s\":\n", argv[optind + 1]);
 
     // Add BOOT
@@ -192,14 +192,14 @@ int main(int argc, char **argv)
         image_size += put_file(fd_img, file);
         if(image_size > CONFIG.boot_length_max) {
             fprintf(out, " failed!\n");
-            fprintf(err, "Boot strap \"%s\" is too large! (%d bytes)\n", file, image_size);
+            fprintf(err, "Boot strap \"%s\" is too large! (%ld bytes)\n", file, image_size);
             return 1;
         } else {
             if(image_size < CONFIG.boot_length_min)
                 image_size += pad(fd_img, CONFIG.boot_length_min - image_size);
         }
     }
-    unsigned int boot_size = image_size;
+    unsigned long boot_size = image_size;
 
     // Add SETUP
     sprintf(file, "%s/img/setup_%s", argv[optind], CONFIG.mmod);
@@ -328,7 +328,7 @@ int main(int argc, char **argv)
 
     // Finish
     close(fd_img);
-    fprintf(out, "\n  Image successfully generated (%d bytes)!\n\n", image_size);
+    fprintf(out, "\n  Image successfully generated (%ld bytes)!\n\n", image_size);
 
     return 0;
 }

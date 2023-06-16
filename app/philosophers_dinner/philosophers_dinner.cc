@@ -33,6 +33,10 @@ int main()
     phil[2] = new Thread(&philosopher, 2, 16, 39);
     phil[3] = new Thread(&philosopher, 3, 16, 24);
     phil[4] = new Thread(&philosopher, 4, 10, 20);
+    phil[4] = new Thread(&philosopher, 5, 10, 20);
+    phil[4] = new Thread(&philosopher, 6, 10, 20);
+    phil[4] = new Thread(&philosopher, 7, 10, 20);
+    phil[4] = new Thread(&philosopher, 8, 10, 20);
 
     cout << "Philosophers are alive and hungry!" << endl;
 

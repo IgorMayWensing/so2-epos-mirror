@@ -37,7 +37,7 @@ Segment::Phy_Addr Segment::phy_address() const
 }
 
 
-int Segment::resize(long amount)
+long Segment::resize(long amount)
 {
     db<Segment>(TRC) << "Segment::resize(amount=" << amount << ")" << endl;
 
