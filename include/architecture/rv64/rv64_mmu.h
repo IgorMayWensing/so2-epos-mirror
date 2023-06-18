@@ -224,6 +224,13 @@ public:
 
             return size();
         }
+    
+        void reflag(Page_Flags newFlags) {
+            for (unsigned int i = 0; i < _pts; i++) {
+                for (unsigned int j = 0; j < PT_ENTRIES; j++)
+                    _pt[i].log()[j] = (_pt[i].log()[j] & ~Page_Flags::MASK) | newFlags;
+            }
+        }
 
     private:
         bool _free;

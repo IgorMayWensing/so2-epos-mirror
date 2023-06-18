@@ -211,11 +211,14 @@ public:
             _current->address_space()->detach(task->data_segment());
         }
 
-        // Map segments
+        // reflag
+        _cs->reflag(Segment::Flags::APPC);
+        _ds->reflag(Segment::Flags::APPD);
+
         _code = _as->attach(_cs, task->code());
         _data = _as->attach(_ds, task->data());
 
-        db<Task>(TRC) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
+        db<Task>(INF) << "Task(as=" << _as << ",cs=" << _cs << ",ds=" << _ds << ",entry=" << _entry << ",code=" << _code << ",data=" << _data << ") => " << this << endl;
 
         // Create the task's main thread
         _main = new (SYSTEM) Thread(Thread::Configuration(Thread::READY, Thread::NORMAL, this, 0), static_cast<int (*)(Tn ...)>(_entry), an ...);

@@ -335,9 +335,11 @@ public:
         ksp -= sizeof(Context);
         Context * ctx = new(ksp) Context(entry, exit, usp); // init_stack is called with usp = 0 for kernel threads
         init_stack_helper(&ctx->_x10, an ...); // x10 is a0
-        ksp -= sizeof(Context);
-        ctx = new(ksp) Context(&_int_leave, 0, 0); // this context will be popped by switch() to reach _int_leave(), which will activate the thread's context
-        ctx->_x10 = 0; // zero fr() for the pop(true) issued by _int_leave()
+        if (usp) {
+            ksp -= sizeof(Context);
+            ctx = new(ksp) Context(&_int_leave, 0, 0); // this context will be popped by switch() to reach _int_leave(), which will activate the thread's context
+            ctx->_x10 = 0; // zero fr() for the pop(true) issued by _int_leave()
+        }
         return ctx;
     }
 
