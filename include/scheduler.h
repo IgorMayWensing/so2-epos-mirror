@@ -145,26 +145,17 @@ public:
     FCFS(int p = NORMAL, Tn & ... an);
 };
 
-// Custom scheduling policy
-class mySched: public Priority
+// Last-Come, First-Serve (LIFO)
+class LCFS: public Priority
 {
 public:
     static const bool timed = false;
-    static const bool dynamic = true;
-    static const bool preemptive = true;
+    static const bool dynamic = false;
+    static const bool preemptive = false;
 
 public:
     template <typename ... Tn>
-    mySched(int p = NORMAL, Tn & ... an): Priority(p) {}
-
-    operator const volatile int() const volatile {
-        //Prioritize threads with even IDs over odd IDs
-        if (_priority % 2 == 0) {
-            return _priority + 1;
-        } else {
-            return _priority;
-        }
-    }
+    LCFS(int p = NORMAL, Tn & ... an);
 };
 
 __END_SYS

@@ -128,6 +128,7 @@ protected:
     Task * _task;
     Segment * _user_stack;
 
+    long * _id;
     char * _stack;
     Context * volatile _context;
     volatile State _state;

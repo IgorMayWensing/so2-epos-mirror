@@ -102,7 +102,7 @@ class Task;
 class Priority;
 class FCFS;
 class RR;
-class mySched;
+class LCFS;
 class RM;
 class DM;
 class EDF;

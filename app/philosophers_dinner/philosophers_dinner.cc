@@ -29,14 +29,20 @@ int main()
         chopstick[i] = new Semaphore;
 
     phil[0] = new Thread(&philosopher, 0,  5, 32);
+    Alarm::delay(Milisecond(111));
     phil[1] = new Thread(&philosopher, 1, 10, 44);
+    Alarm::delay(Milisecond(111));
     phil[2] = new Thread(&philosopher, 2, 16, 39);
+    Alarm::delay(Milisecond(111));
     phil[3] = new Thread(&philosopher, 3, 16, 24);
+    Alarm::delay(Milisecond(111));
     phil[4] = new Thread(&philosopher, 4, 10, 20);
-    phil[4] = new Thread(&philosopher, 5, 10, 20);
-    phil[4] = new Thread(&philosopher, 6, 10, 20);
-    phil[4] = new Thread(&philosopher, 7, 10, 20);
-    phil[4] = new Thread(&philosopher, 8, 10, 20);
+
+    cout << "0 prio is:" << phil[0]->priority() << endl;
+    cout << "1 prio is:" << phil[1]->priority() << endl;
+    cout << "2 prio is:" << phil[2]->priority() << endl;
+    cout << "3 prio is:" << phil[3]->priority() << endl;
+    cout << "4 prio is:" << phil[4]->priority() << endl;
 
     cout << "Philosophers are alive and hungry!" << endl;
 
