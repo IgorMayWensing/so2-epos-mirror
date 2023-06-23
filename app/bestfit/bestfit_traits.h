@@ -9,7 +9,7 @@ __BEGIN_SYS
 template<> struct Traits<Build>: public Traits_Tokens
 {
     // Basic configuration
-    static const unsigned int MODE = LIBRARY;
+    static const unsigned int MODE = KERNEL;
     static const unsigned int ARCHITECTURE = RV64;
     static const unsigned int MACHINE = RISCV;
     static const unsigned int MODEL = SiFive_U;
@@ -103,8 +103,9 @@ template<> struct Traits<Application>: public Traits<Build>
 template<> struct Traits<System>: public Traits<Build>
 {
     static const unsigned int mode = Traits<Build>::MODE;
-    static const bool multithread = (Traits<Application>::MAX_THREADS > 1);
-    static const bool multiheap = Traits<Scratchpad>::enabled;
+    static const bool multithread = (Traits<Build>::CPUS > 1) || (Traits<Application>::MAX_THREADS > 1);
+    static const bool multitask = (mode != Traits<Build>::LIBRARY);
+    static const bool multiheap = multitask || Traits<Scratchpad>::enabled;
 
     static const unsigned long LIFE_SPAN = 1 * YEAR; // s
     static const unsigned int DUTY_CYCLE = 1000000; // ppm
@@ -115,12 +116,19 @@ template<> struct Traits<System>: public Traits<Build>
     static const unsigned int HEAP_SIZE = (Traits<Application>::MAX_THREADS + 1) * Traits<Application>::STACK_SIZE;
 };
 
+template<> struct Traits<Task>: public Traits<Build>
+{
+    static const bool enabled = Traits<System>::multitask;
+};
+
 template<> struct Traits<Thread>: public Traits<Build>
 {
     static const bool enabled = Traits<System>::multithread;
     static const bool trace_idle = hysterically_debugged;
-    static const bool preemptive = true;
-    static const unsigned int QUANTUM = 100000; // us
+    static const bool simulate_capacity = false;
+    static const unsigned int QUANTUM = 10000; // us
+
+    typedef LCFS Criterion;
 };
 
 template<> struct Traits<Scheduler<Thread>>: public Traits<Build>
