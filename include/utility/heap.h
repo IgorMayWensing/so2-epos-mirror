@@ -46,7 +46,7 @@ public:
         if(bytes < sizeof(Element))
             bytes = sizeof(Element);
 
-        Element * e = search_decrementing(bytes);
+        Element * e = search_decrementing(bytes); //procura o bloco la na list.h
         if(!e) {
             out_of_memory(bytes);
             return 0;
