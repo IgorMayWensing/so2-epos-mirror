@@ -583,14 +583,29 @@ public:
     using Base::remove;
 
     unsigned long grouped_size() const { return _grouped_size; }
-
+//exercicio 6b
     Element * search_size(unsigned long s) {
         Element * e = head();
-        if(sizeof(Object_Type) < sizeof(Element))
-            for(; e && (e->size() < sizeof(Element) / sizeof(Object_Type) + s) && (e->size() != s); e = e->next());
+        Element * bestfit = e; //best block to return
+        unsigned long aux_size; //size of a block in the list
+        aux_size = 2^64 - 1; //the max ulong value
+        
+        
+        if(sizeof(Object_Type) < sizeof(Element)){
+            for(; e ; e = e->next()) //now this run through all list
+            	if( (e->size() < aux_size) && (e->size() >= sizeof(Element) / sizeof(Object_Type) + s) )//if we find a better sized block
+            	{
+            		aux_size = e->size();
+            		bestfit = e;
+            	}
+        }    	
         else
-            for(; e && (e->size() < s); e = e->next());
-        return e;
+            for(; e ; e = e->next())
+            	if(e->size() < aux_size && e->size() >= s ){
+            		aux_size = e->size();
+            		bestfit = e;
+            	}
+        return bestfit;
     }
 
     void insert_merging(Element * e, Element ** m1, Element ** m2) {
@@ -1345,7 +1360,7 @@ public:
     using Base::print_tail;
 
     unsigned long grouped_size() const { return _grouped_size; }
-
+/*
     Element * search_size(unsigned long s) {
         Element * e = head();
         if(sizeof(Object_Type) < sizeof(Element))
@@ -1353,6 +1368,31 @@ public:
         else
             for(; e && (e->size() < s); e = e->next());
         return e;
+    }
+*/
+//exercicio 6b
+    Element * search_size(unsigned long s) {
+        Element * e = head();
+        Element * bestfit = e; //best block to return
+        unsigned long aux_size; //size of a block in the list
+        aux_size = (2^64) - 1; //the max ulong value
+        
+        
+        if(sizeof(Object_Type) < sizeof(Element)){
+            for(; e ; e = e->next()) //now this run through all list
+            	if( (e->size() < aux_size) && (e->size() >= sizeof(Element) / sizeof(Object_Type) + s) )//if we find a better sized block
+            	{
+            		aux_size = e->size();
+            		bestfit = e;
+            	}
+        }    	
+        else
+            for(; e ; e = e->next())
+            	if(e->size() < aux_size && e->size() >= s ){
+            		aux_size = e->size();
+            		bestfit = e;
+            	}
+        return bestfit;
     }
 
     void insert_merging(Element * e, Element ** m1, Element ** m2) {
